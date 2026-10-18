@@ -1,0 +1,25 @@
+# ==============================================================================
+# HXN GENESIS — DEVELOPMENT, BUILD & TEST DEPENDENCIES (requirements-dev.txt)
+# ==============================================================================
+# IMPORTANT NOTICE:
+# This file documents the development-only toolchain (`devDependencies` in
+# `package.json`). This is a Node.js / TypeScript project, NOT a Python project.
+# DO NOT run `pip install -r requirements-dev.txt`.
+#
+# Both runtime and development dependencies are installed together when you run:
+#   npm ci
+#   -- or --
+#   npm install
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# DEVELOPMENT, COMPILER, TEST & BENCHMARK TOOLCHAIN
+# ------------------------------------------------------------------------------
+# Package Name         Spec in package.json   Purpose
+# -------------------  ---------------------  ----------------------------------------------------------------
+# typescript           ^5.6.0                 Static type checker (`tsc --noEmit`) for ES2022/DOM modules
+# vite                 ^6.0.0                 Local dev server (`npm run dev`) & production bundler (`npm run build`)
+# vitest               ^2.1.0                 Unit & integration test runner (`npm test`)
+# tsx                  ^4.19.0                TypeScript CLI executor for simulation benchmarks (`npm run bench`)
+# @types/three         ^0.170.0               TypeScript type definitions for Three.js WebGL engine
+# @types/node          ^22.0.0                TypeScript type definitions for Node.js benchmark & test environment

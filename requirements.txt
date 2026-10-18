@@ -1,0 +1,44 @@
+# ==============================================================================
+# HXN GENESIS — SYSTEM & RUNTIME DEPENDENCY MANIFEST (requirements.txt)
+# ==============================================================================
+# IMPORTANT NOTICE:
+# This project is built with TypeScript, Vite, and Three.js (Node.js ecosystem).
+# It is NOT a Python project. DO NOT run `pip install -r requirements.txt`.
+#
+# The canonical dependency manifests for automated installation are:
+#   - package.json
+#   - package-lock.json
+#
+# To install all runtime and development dependencies automatically, run:
+#   npm ci          (recommended for exact reproducible builds from package-lock.json)
+#   -- or --
+#   npm install     (standard installation)
+# ==============================================================================
+
+# ------------------------------------------------------------------------------
+# 1. SYSTEM & ENVIRONMENT REQUIREMENTS
+# ------------------------------------------------------------------------------
+# - Operating System : Windows 10/11 (x64/ARM64), Linux (Ubuntu 20.04+, Debian,
+#                      Fedora, Arch), or macOS 12+ (Intel / Apple Silicon)
+# - Node.js          : >= 20.0.0 LTS (Verified on Node.js v26.11.1)
+# - npm              : >= 10.0.0     (Verified on npm v12.2.0)
+# - Browser          : Modern browser with WebGL 2.0 hardware acceleration
+#                      (Chrome 110+, Edge 110+, Firefox 115+, Safari 16.4+)
+# - GPU / Display    : Integrated or discrete GPU supporting OpenGL ES 3.0 / WebGL2
+
+# ------------------------------------------------------------------------------
+# 2. PRODUCTION RUNTIME DEPENDENCIES (Installed via npm from package.json)
+# ------------------------------------------------------------------------------
+# Package Name         Spec in package.json   Resolved Lockfile Version   Purpose
+# -------------------  ---------------------  --------------------------  --------------------------------------------
+# three                ^0.170.0               0.170.0                     3D WebGL planetary rendering, shaders, orbit camera
+
+# ------------------------------------------------------------------------------
+# 3. EXTERNAL ASSETS & NETWORK SERVICES
+# ------------------------------------------------------------------------------
+# None required. All planetary terrain, bathymetry, clouds, atmospheric shaders,
+# and climate fields are generated 100% procedurally and deterministically on
+# the local machine without external API keys, databases, or cloud downloads.
+#
+# For development, testing, and benchmarking dependencies, see:
+#   requirements-dev.txt

@@ -1,0 +1,893 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>HXN GENESIS — Ultimate Living Planet Simulator</title>
+    <link rel="stylesheet" href="/src/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- 3D WebGL Viewport -->
+      <div id="viewport-container"></div>
+
+      <!-- Top Telemetry & Time-Warp Bar -->
+      <header id="top-bar" class="glass-panel">
+        <div class="brand-block">
+          <button id="btn-toggle-left" class="btn btn-icon" data-i18n-title="btn.toggle_left_title" title="Toggle God Mode Panel ([)">◧</button>
+          <div class="brand-badge">HXN</div>
+          <div>
+            <h1 class="brand-title">HXN GENESIS</h1>
+            <div class="brand-subtitle" data-i18n="brand.subtitle">PLANETARY ENVIRONMENT, CLIMATE & EVOLUTION SANDBOX</div>
+          </div>
+        </div>
+
+        <div class="time-controls-block">
+          <div class="transport-buttons">
+            <button id="btn-pause" class="btn btn-primary" data-i18n-title="btn.pause_title" title="Pause / Resume Simulation (Space)">⏸ Pause</button>
+            <button id="btn-step" class="btn" data-i18n="btn.step" data-i18n-title="btn.step_title" title="Advance Single Physics Step (+10 min)">⏭ Step</button>
+          </div>
+          <div class="speed-presets" id="speed-preset-group">
+            <button class="btn speed-btn active" data-speed="1">1x</button>
+            <button class="btn speed-btn" data-speed="2">2x</button>
+            <button class="btn speed-btn" data-speed="10">10x</button>
+            <button class="btn speed-btn" data-speed="100">100x</button>
+            <button class="btn speed-btn" data-speed="1000">1,000x</button>
+            <button class="btn speed-btn" data-speed="1e6">1e6x</button>
+            <button class="btn speed-btn" data-speed="1e9">1e9x</button>
+            <button class="btn speed-btn" data-speed="1e100">1e100x</button>
+          </div>
+          <div class="custom-speed-wrap">
+            <input id="input-custom-speed" type="text" value="1e12" data-i18n-placeholder="input.custom_speed_placeholder" placeholder="e.g. 5e40" data-i18n-title="input.custom_speed_title" title="Scientific speed multiplier (supports up to 1e100+)" />
+            <button id="btn-apply-speed" class="btn" data-i18n="btn.set_speed">Set Speed</button>
+          </div>
+        </div>
+
+        <div class="top-right-group">
+          <div class="time-readout-block">
+            <div class="time-mode-pill" id="readout-time-mode">MODE: REALTIME</div>
+            <div class="time-epoch" id="readout-geological">0.00 yr (Holocene-scale)</div>
+            <div class="time-sub" id="readout-time-breakdown">0 s | 0.00 hr | 0.00 d</div>
+          </div>
+          <button
+            id="btn-ui-mode"
+            class="btn"
+            data-i18n="btn.mode_creator"
+            data-i18n-title="btn.mode_toggle_title"
+            title="Toggle between Creator Mode (simplified) and Advanced Scientific Mode"
+          >
+            🎨 Creator Mode
+          </button>
+          <button
+            id="btn-graticule"
+            class="btn"
+            data-i18n="btn.graticule"
+            data-i18n-title="btn.graticule_title"
+            title="Toggle 3D Latitude/Longitude Graticule & Axial Tilt Indicator (G)"
+          >
+            🌐 Grid
+          </button>
+          <button
+            id="btn-open-help"
+            class="btn"
+            data-i18n="btn.help"
+            data-i18n-title="btn.help_title"
+            title="Open Interactive Tutorial & Controls Guide (?)"
+          >
+            ❓ Help & Tour
+          </button>
+          <button
+            id="btn-lang-toggle"
+            class="btn btn-lang"
+            data-i18n="lang.current_badge"
+            data-i18n-title="lang.toggle_title"
+            title="Switch interface language to Vietnamese (Chuyển sang Tiếng Việt)"
+          >
+            🇬🇧 English
+          </button>
+          <button id="btn-toggle-right" class="btn btn-icon" data-i18n-title="btn.toggle_right_title" title="Toggle Telemetry Panel (])">◨</button>
+        </div>
+      </header>
+
+      <!-- Left Panel: God Mode & Evolution Lab Controls -->
+      <aside id="left-panel" class="glass-panel">
+        <div class="panel-tabs">
+          <button class="tab-btn active" data-tab="tab-world" data-i18n="tab.world">World & Seed</button>
+          <button class="tab-btn" data-tab="tab-climate" data-i18n="tab.climate">Atmosphere</button>
+          <button class="tab-btn" data-tab="tab-sculpt" data-i18n="tab.sculpt">Life & Hazards</button>
+          <button class="tab-btn" data-tab="tab-evolab" data-i18n="tab.evolab">🧬 Evo Lab</button>
+          <button class="tab-btn" data-tab="tab-history" data-i18n="tab.history">Save & Log</button>
+        </div>
+
+        <!-- TAB 1: World & Seed & Presets -->
+        <section id="tab-world" class="tab-content active">
+          <div class="section-header" data-i18n="section.preset_seed">Planetary Scenario & Deterministic Seed</div>
+          <div class="control-row">
+            <label for="select-preset" data-i18n="label.world_preset">Planetary Scenario (12 Presets)</label>
+            <select id="select-preset">
+              <option value="Earth-like" data-i18n="preset.earth">Earth-like (Initial Abiotic)</option>
+              <option value="Habitable Young Planet" data-i18n="preset.young">Habitable Young Planet (Archean Warmth)</option>
+              <option value="Ice World" data-i18n="preset.ice">Ice World (Cryogenic Glaciation)</option>
+              <option value="Desert World" data-i18n="preset.desert">Desert World (Hyper-Arid Dune/Rock)</option>
+              <option value="Ocean World" data-i18n="preset.ocean">Ocean World (Pelagic Bathymetry)</option>
+              <option value="Volcanic World" data-i18n="preset.volcanic">Volcanic World (Hadean Outgassing)</option>
+              <option value="Rapid Greenhouse" data-i18n="preset.greenhouse">Rapid Greenhouse (Super-CO₂ Hothouse)</option>
+              <option value="Glaciation & Recovery" data-i18n="preset.glaciation">Glaciation & Recovery (Snowball Cycle)</option>
+              <option value="Mass Extinction Testbed" data-i18n="preset.extinction">Mass Extinction Testbed (High Fragility)</option>
+              <option value="Isolated Evolution" data-i18n="preset.isolated">Isolated Evolution (Archipelago Radiation)</option>
+              <option value="Low-Oxygen Biospheres" data-i18n="preset.lowo2">Low-Oxygen Biospheres (Anaerobic Bias)</option>
+              <option value="Custom" data-i18n="preset.custom">Custom Configuration</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <label for="input-seed" data-i18n="label.seed">Deterministic Seed</label>
+            <div class="inline-input-group">
+              <input id="input-seed" type="text" value="HXN-TERRA-01" />
+              <button id="btn-regen-seed" class="btn btn-accent" data-i18n="btn.generate_seed">Generate</button>
+            </div>
+          </div>
+
+          <div class="section-header" data-i18n="section.planet_identity">Planet Identity & Physical Properties</div>
+          <div class="control-row">
+            <label for="input-planet-name" data-i18n="label.planet_name">Planet Name</label>
+            <input id="input-planet-name" type="text" value="Genesis Prime" data-i18n-placeholder="input.planet_name_placeholder" placeholder="e.g. Genesis Prime" />
+          </div>
+
+          <div class="control-row">
+            <label for="select-terrain-style" data-i18n="label.terrain_style">Procedural Terrain Style (10 Styles)</label>
+            <select id="select-terrain-style">
+              <option value="EARTH_CONTINENTS" data-i18n="style.EARTH_CONTINENTS">Earth Continents & Basins</option>
+              <option value="ARCHIPELAGO" data-i18n="style.ARCHIPELAGO">Volcanic Island Archipelago</option>
+              <option value="SUPERCONTINENT" data-i18n="style.SUPERCONTINENT">Pangaea Supercontinent</option>
+              <option value="OCEAN_PLANET" data-i18n="style.OCEAN_PLANET">Pelagic Ocean Planet</option>
+              <option value="DESERT_PLANET" data-i18n="style.DESERT_PLANET">Arid Dune & Plateau World</option>
+              <option value="ICE_WORLD" data-i18n="style.ICE_WORLD">Cryogenic Glaciated World</option>
+              <option value="VOLCANIC_WORLD" data-i18n="style.VOLCANIC_WORLD">Tectonic Caldera & Lava World</option>
+              <option value="CRATERED_WORLD" data-i18n="style.CRATERED_WORLD">Heavily Cratered Highlands</option>
+              <option value="ALIEN" data-i18n="style.ALIEN">Alien Warped Terraces</option>
+              <option value="CUSTOM" data-i18n="style.CUSTOM">Custom Procedural Relief</option>
+            </select>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.planet_radius">Planet Radius (km)</span>
+              <strong id="val-planet-radius">6371 km (1.00 R⊕)</strong>
+            </div>
+            <input id="slider-planet-radius" type="range" min="1800" max="15000" step="50" value="6371" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.planet_mass">Planet Mass (M⊕)</span>
+              <strong id="val-planet-mass">1.00 M⊕</strong>
+            </div>
+            <input id="slider-planet-mass" type="range" min="0.05" max="8.0" step="0.05" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.rotation_period">Rotation Period / Day Length (hr)</span>
+              <strong id="val-rotation-period">24.0 hr</strong>
+            </div>
+            <input id="slider-rotation-period" type="range" min="4" max="240" step="1" value="24" />
+          </div>
+
+          <div class="control-row">
+            <label for="select-star-type" data-i18n="label.star_type">Host Star Spectral Class</label>
+            <select id="select-star-type">
+              <option value="G" data-i18n="star.G">G-Star (Sun-like, 1.00 L☉)</option>
+              <option value="K" data-i18n="star.K">K-Star (Orange Dwarf, 0.35 L☉)</option>
+              <option value="M" data-i18n="star.M">M-Dwarf (Red Dwarf, 0.04 L☉)</option>
+              <option value="F" data-i18n="star.F">F-Star (Yellow-White, 2.60 L☉)</option>
+            </select>
+          </div>
+
+          <div class="advanced-only">
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.orbital_distance">Orbital Semi-Major Axis (AU)</span>
+                <strong id="val-orbital-distance">1.00 AU</strong>
+              </div>
+              <input id="slider-orbital-distance" type="range" min="0.15" max="3.0" step="0.02" value="1.0" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.eccentricity">Orbital Eccentricity (e)</span>
+                <strong id="val-eccentricity">0.017</strong>
+              </div>
+              <input id="slider-eccentricity" type="range" min="0.0" max="0.55" step="0.01" value="0.017" />
+            </div>
+
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.gravity_override">Custom Gravity Override (m/s²)</span>
+                <strong id="val-gravity-override">Auto (GM/R²)</strong>
+              </div>
+              <input id="slider-gravity-override" type="range" min="0" max="30" step="0.2" value="0" />
+            </div>
+          </div>
+
+          <div class="honesty-box" style="margin-top: 4px;">
+            <div class="honesty-row">
+              <span data-i18n="derived.gravity">Surface Gravity (g)</span>
+              <strong id="derived-gravity-val">9.81 m/s² (1.00 g)</strong>
+            </div>
+            <div class="honesty-row">
+              <span data-i18n="derived.density">Bulk Density (ρ)</span>
+              <strong id="derived-density-val">5.51 g/cm³</strong>
+            </div>
+            <div class="honesty-row">
+              <span data-i18n="derived.escape">Escape Velocity (vₑ)</span>
+              <strong id="derived-escape-val">11.19 km/s</strong>
+            </div>
+            <div class="honesty-row">
+              <span data-i18n="derived.lapse">Adiabatic Lapse Rate</span>
+              <strong id="derived-lapse-val">6.50 K/km</strong>
+            </div>
+          </div>
+
+          <div class="advanced-only">
+            <div class="section-header" data-i18n="section.terrain_gen">Advanced Terrain Generator Settings</div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.roughness">Fine Crust Roughness</span>
+                <strong id="val-roughness">1.00x</strong>
+              </div>
+              <input id="slider-roughness" type="range" min="0.1" max="2.0" step="0.05" value="1.0" />
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.mountain_height">Mountain Belt Height</span>
+                <strong id="val-mountain-height">1.00x</strong>
+              </div>
+              <input id="slider-mountain-height" type="range" min="0.0" max="2.0" step="0.05" value="1.0" />
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.continent_scale">Continent Feature Size</span>
+                <strong id="val-continent-scale">1.00x</strong>
+              </div>
+              <input id="slider-continent-scale" type="range" min="0.5" max="2.0" step="0.05" value="1.0" />
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.crater_density">Impact Crater Density</span>
+                <strong id="val-crater-density">0%</strong>
+              </div>
+              <input id="slider-crater-density" type="range" min="0.0" max="1.0" step="0.05" value="0.0" />
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.plateaus">Plateau Terracing</span>
+                <strong id="val-plateaus">0%</strong>
+              </div>
+              <input id="slider-plateaus" type="range" min="0.0" max="1.0" step="0.05" value="0.0" />
+            </div>
+            <button id="btn-regen-terrain" class="btn btn-accent" style="width: 100%; margin-top: 4px;" data-i18n="btn.regen_terrain">↻ Regenerate Terrain with Style</button>
+
+            <div class="section-header" data-i18n="section.geology">Planetary Interior & Plate Tectonics</div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.internal_heat">Internal Radiogenic Heat</span>
+                <strong id="val-internal-heat">1.00x</strong>
+              </div>
+              <input id="slider-internal-heat" type="range" min="0.1" max="3.0" step="0.05" value="1.0" />
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.crust_thickness">Crustal Thickness (km)</span>
+                <strong id="val-crust-thickness">35 km</strong>
+              </div>
+              <input id="slider-crust-thickness" type="range" min="5" max="80" step="1" value="35" />
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.mantle_activity">Mantle Plume Activity</span>
+                <strong id="val-mantle-activity">1.00x</strong>
+              </div>
+              <input id="slider-mantle-activity" type="range" min="0.0" max="3.0" step="0.05" value="1.0" />
+            </div>
+            <div class="slider-group">
+              <div class="slider-label">
+                <span data-i18n="label.tectonic_activity">Plate Boundary Uplift Rate</span>
+                <strong id="val-tectonic-activity">1.00x</strong>
+              </div>
+              <input id="slider-tectonic-activity" type="range" min="0.0" max="3.0" step="0.05" value="1.0" />
+            </div>
+            <div class="honesty-row" style="margin: 4px 0;">
+              <span data-i18n="label.impact_count">Recorded Major Impacts</span>
+              <strong id="val-impact-count">0</strong>
+            </div>
+            <button id="btn-tectonic-pulse" class="btn btn-warn" style="width: 100%;" data-i18n="btn.tectonic_pulse">⛰ Trigger Tectonic Uplift Pulse</button>
+          </div>
+
+          <div class="control-row">
+            <label for="select-quality" data-i18n="label.visual_quality">3D Render Quality Preset</label>
+            <select id="select-quality">
+              <option value="High" data-i18n="quality.high">High (Cinematic)</option>
+              <option value="Medium" data-i18n="quality.medium">Medium (Balanced)</option>
+              <option value="Low" data-i18n="quality.low">Low (Performance)</option>
+            </select>
+          </div>
+
+          <div class="section-header" data-i18n="section.hypsometry">Planetary Hypsometry & Hydrosphere</div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.ocean_target">Target Ocean Coverage (%)</span>
+              <strong id="val-ocean-target">70%</strong>
+            </div>
+            <input id="slider-ocean-target" type="range" min="0" max="100" step="1" value="70" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.sealevel">Sea Level Datum Offset</span>
+              <strong id="val-sealevel">0 m</strong>
+            </div>
+            <input id="slider-sealevel" type="range" min="-5000" max="5000" step="50" value="0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.terrain_scale">Crust Relief Scale</span>
+              <strong id="val-terrain-scale">1.00x</strong>
+            </div>
+            <input id="slider-terrain-scale" type="range" min="0.2" max="2.5" step="0.05" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.ice_impulse">Cryosphere Ice Target Impulse</span>
+              <strong id="val-ice-impulse">10%</strong>
+            </div>
+            <div class="inline-input-group">
+              <input id="slider-ice-impulse" type="range" min="0" max="100" step="2" value="10" />
+              <button id="btn-apply-ice" class="btn" data-i18n="btn.apply_ice">Apply Ice</button>
+            </div>
+          </div>
+
+          <div class="section-header" data-i18n="section.vis_layer">Data Visualization Layer</div>
+          <div class="layer-grid" id="overlay-btn-group">
+            <button class="btn layer-btn active" data-layer="TRUE_COLOR" data-i18n="layer.true_color">True Color (Rock/Life)</button>
+            <button class="btn layer-btn" data-layer="BIOSPHERE" data-i18n="layer.biosphere">🌿 Biosphere Composite</button>
+            <button class="btn layer-btn" data-layer="HABITABILITY" data-i18n="layer.habitability">💧 Habitability Index</button>
+            <button class="btn layer-btn" data-layer="BIOMASS" data-i18n="layer.biomass">🌲 Flora Biomass</button>
+            <button class="btn layer-btn" data-layer="FAUNA" data-i18n="layer.fauna">🦎 Fauna Density</button>
+            <button class="btn layer-btn" data-layer="BIODIVERSITY" data-i18n="layer.biodiversity">🧬 Biodiversity (H')</button>
+            <button class="btn layer-btn" data-layer="EXTINCTION_IMPACT" data-i18n="layer.extinction_impact">☄️ Extinction Stress</button>
+            <button class="btn layer-btn" data-layer="TEMPERATURE" data-i18n="layer.temperature">🌡 Surface Temp</button>
+            <button class="btn layer-btn" data-layer="ELEVATION" data-i18n="layer.elevation">⛰ Crust Elevation</button>
+            <button class="btn layer-btn" data-layer="PRECIPITATION" data-i18n="layer.precipitation">🌧 Precipitation</button>
+            <button class="btn layer-btn" data-layer="ICE" data-i18n="layer.ice">❄ Cryosphere Ice</button>
+            <button class="btn layer-btn" data-layer="WIND" data-i18n="layer.wind">💨 Wind Velocity</button>
+          </div>
+
+          <div class="button-row-2" style="margin-top: 6px;">
+            <button class="btn cam-preset-btn" data-cam-preset="DEFAULT" data-i18n="cam.default">🌐 Default View</button>
+            <button class="btn cam-preset-btn" data-cam-preset="NORTH_POLE" data-i18n="cam.north">⬆ North Pole</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 4px;">
+            <button class="btn cam-preset-btn" data-cam-preset="EQUATOR" data-i18n="cam.equator">➖ Equator</button>
+            <button class="btn cam-preset-btn" data-cam-preset="SOUTH_POLE" data-i18n="cam.south">⬇ South Pole</button>
+          </div>
+
+          <div class="section-header" data-i18n="section.reset_undo">Reset & Undo Controls</div>
+          <div class="button-row-2">
+            <button id="btn-undo" class="btn" data-i18n="btn.undo" disabled>↩ Undo</button>
+            <button id="btn-redo" class="btn" data-i18n="btn.redo" disabled>↪ Redo</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 6px;">
+            <button id="btn-reset-partial" class="btn btn-warn" data-i18n="btn.reset_partial" data-i18n-title="btn.reset_partial_title" title="Reset atmosphere, ocean waves & ice while preserving sculpted crust">Partial Reset</button>
+            <button id="btn-reset-full" class="btn btn-danger" data-i18n="btn.reset_full" data-i18n-title="btn.reset_full_title" title="Full reset of crust, time, biosphere, and parameters">Full Reset</button>
+          </div>
+        </section>
+
+        <!-- TAB 2: Atmosphere & Coupled Climate -->
+        <section id="tab-climate" class="tab-content">
+          <div class="section-header" data-i18n="section.gas_composition">Atmospheric Gas Composition & Pressure</div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.pressure_bar">Surface Atmospheric Pressure</span>
+              <strong id="val-pressure-bar">1.00 bar</strong>
+            </div>
+            <input id="slider-pressure-bar" type="range" min="0.02" max="15.0" step="0.05" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.co2">Atmospheric CO₂</span>
+              <strong id="val-co2">280 ppm</strong>
+            </div>
+            <input id="slider-co2" type="range" min="50" max="8000" step="10" value="280" />
+            <div class="micro-note" data-i18n="note.co2_formula">Logarithmic forcing: ΔF = 5.35 × ln(C/280) W/m²</div>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.o2">Atmospheric O₂ (Photosynthesis)</span>
+              <strong id="val-o2">0.1%</strong>
+            </div>
+            <input id="slider-o2" type="range" min="0" max="35" step="0.5" value="0.1" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.argon">Argon (Ar Inert Trace)</span>
+              <strong id="val-argon">0.93%</strong>
+            </div>
+            <input id="slider-argon" type="range" min="0" max="10" step="0.05" value="0.93" />
+          </div>
+
+          <div class="honesty-row" style="margin-bottom: 4px;">
+            <span data-i18n="label.nitrogen_filler">Nitrogen Balance (N₂ Filler)</span>
+            <strong id="val-nitrogen-filler">98.94%</strong>
+          </div>
+          <div class="micro-note" data-i18n="note.gas_balance">Editing O₂, CO₂, or Ar automatically adjusts N₂ filler without altering other tracked gases.</div>
+
+          <div class="section-header" data-i18n="section.radiative">Radiative Forcing & Insolation</div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.o2_eff">Photosynthetic O₂ Yield Multiplier</span>
+              <strong id="val-o2-eff">1.00x</strong>
+            </div>
+            <input id="slider-o2-eff" type="range" min="0.0" max="2.5" step="0.05" value="1.0" />
+          </div>
+
+          <div class="control-row checkbox-row">
+            <label for="chk-abiogenesis" data-i18n="label.abiogenesis">Spontaneous Deep-Time Abiogenesis</label>
+            <input id="chk-abiogenesis" type="checkbox" checked />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.solar">Solar Luminosity (S / S₀)</span>
+              <strong id="val-solar">1.00 S₀ (1361 W/m²)</strong>
+            </div>
+            <input id="slider-solar" type="range" min="0.4" max="2.0" step="0.01" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.tilt">Planetary Axial Tilt</span>
+              <strong id="val-tilt">23.4°</strong>
+            </div>
+            <input id="slider-tilt" type="range" min="0" max="60" step="0.5" value="23.4" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.temp_offset">Manual Thermal Forcing Offset</span>
+              <strong id="val-temp-offset">+0.0 K</strong>
+            </div>
+            <input id="slider-temp-offset" type="range" min="-35" max="35" step="0.5" value="0" />
+          </div>
+
+          <div class="control-row checkbox-row">
+            <label for="chk-daynight" data-i18n="label.daynight">Diurnal Day/Night Cycle</label>
+            <input id="chk-daynight" type="checkbox" checked />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.sun_lon">Manual Sun Longitude</span>
+              <strong id="val-sun-lon">0°</strong>
+            </div>
+            <input id="slider-sun-lon" type="range" min="-180" max="180" step="2" value="0" />
+          </div>
+
+          <div class="section-header" data-i18n="section.circulation">Circulation & Hydrology</div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.humidity">Atmospheric Humidity Capacity</span>
+              <strong id="val-humidity">1.00x</strong>
+            </div>
+            <input id="slider-humidity" type="range" min="0.05" max="2.5" step="0.05" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.wind">Global Wind Circulation</span>
+              <strong id="val-wind">1.00x</strong>
+            </div>
+            <input id="slider-wind" type="range" min="0.1" max="3.5" step="0.05" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.precip">Precipitation Efficiency</span>
+              <strong id="val-precip">1.00x</strong>
+            </div>
+            <input id="slider-precip" type="range" min="0.0" max="3.0" step="0.05" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.volcanism">Background Volcanism & Outgassing</span>
+              <strong id="val-volcanism">0.20x</strong>
+            </div>
+            <input id="slider-volcanism" type="range" min="0.0" max="4.0" step="0.05" value="0.2" />
+          </div>
+        </section>
+
+        <!-- TAB 3: Biosphere Seeding, Terrain Sculpting & Catastrophic Hazards -->
+        <section id="tab-sculpt" class="tab-content">
+          <div class="section-header" data-i18n="section.biosphere_controls">Biosphere & Evolutionary Parameters</div>
+          <div class="micro-note" style="margin-bottom: 6px;" data-i18n="note.biosphere_help">
+            Initial world is abiotic (0% life). Seed microbes, flora, or fauna on habitable regions:
+          </div>
+          <div class="button-row-2" style="margin-bottom: 8px;">
+            <button id="btn-seed-global" class="btn btn-accent" data-i18n="btn.seed_global_life">🌍 Bloom Global Biosphere</button>
+            <button id="btn-sterilize-planet" class="btn btn-danger" data-i18n="btn.sterilize_planet">☄️ Sterilize All Life</button>
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.mutation_rate">Genetic Mutation Rate</span>
+              <strong id="val-mutation-rate">1.00x</strong>
+            </div>
+            <input id="slider-mutation-rate" type="range" min="0.0" max="4.0" step="0.1" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.selection_pressure">Natural Selection Pressure</span>
+              <strong id="val-selection-pressure">1.00x</strong>
+            </div>
+            <input id="slider-selection-pressure" type="range" min="0.1" max="3.5" step="0.1" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.reproduction_mult">Biotic Reproduction Multiplier</span>
+              <strong id="val-reproduction-mult">1.00x</strong>
+            </div>
+            <input id="slider-reproduction-mult" type="range" min="0.1" max="3.0" step="0.1" value="1.0" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.extinction_susc">Extinction Susceptibility</span>
+              <strong id="val-extinction-susc">1.00x</strong>
+            </div>
+            <input id="slider-extinction-susc" type="range" min="0.2" max="3.5" step="0.1" value="1.0" />
+          </div>
+
+          <div class="section-header" data-i18n="section.click_tool">Interactive Click Tool on 3D Globe</div>
+          <div class="micro-note" style="margin-bottom: 8px;" data-i18n="note.click_tool_help">
+            Choose what happens when you click a coordinate on the 3D planet:
+          </div>
+          <div class="layer-grid" id="tool-mode-group">
+            <button class="btn tool-btn active" data-tool="INSPECT" data-i18n="tool.inspect">🔍 Inspect Only</button>
+            <button class="btn tool-btn" data-tool="SEED_MICROBES" data-i18n="tool.seed_microbes">🦠 Seed Microbes</button>
+            <button class="btn tool-btn" data-tool="SEED_FLORA" data-i18n="tool.seed_flora">🌿 Seed Flora/Forest</button>
+            <button class="btn tool-btn" data-tool="SEED_FAUNA" data-i18n="tool.seed_fauna">🦎 Seed Fauna/Animals</button>
+            <button class="btn tool-btn" data-tool="SCULPT_RAISE" data-i18n="tool.sculpt_raise">⛰ Raise Crust</button>
+            <button class="btn tool-btn" data-tool="SCULPT_LOWER" data-i18n="tool.sculpt_lower">🌊 Excavate Trench</button>
+            <button class="btn tool-btn" data-tool="SCULPT_SMOOTH" data-i18n="tool.sculpt_smooth">〰 Smooth Terrain</button>
+            <button class="btn tool-btn" data-tool="SCULPT_FLATTEN" data-i18n="tool.sculpt_flatten">📏 Flatten Plateau</button>
+            <button class="btn tool-btn" data-tool="SCULPT_MOUNTAIN" data-i18n="tool.sculpt_mountain">🏔 Raise Mountain Ridge</button>
+            <button class="btn tool-btn" data-tool="SCULPT_BASIN" data-i18n="tool.sculpt_basin">🕳 Carve Basin</button>
+            <button class="btn tool-btn" data-tool="SCULPT_CRATER" data-i18n="tool.sculpt_crater">☄ Stamp Impact Crater</button>
+            <button class="btn tool-btn" data-tool="PAINT_OCEAN" data-i18n="tool.paint_ocean">🌊 Paint Ocean Floor</button>
+            <button class="btn tool-btn" data-tool="PAINT_LAND" data-i18n="tool.paint_land">🏝 Paint Continental Land</button>
+            <button class="btn tool-btn" data-tool="ADD_ICE" data-i18n="tool.add_ice">❄ Paint Glacier Ice</button>
+            <button class="btn tool-btn" data-tool="REMOVE_ICE" data-i18n="tool.remove_ice">🔥 Melt Local Ice</button>
+            <button class="btn tool-btn" data-tool="RESTORE_TERRAIN" data-i18n="tool.restore_terrain">↺ Restore Pristine Crust</button>
+            <button class="btn tool-btn" data-tool="VOLCANO" data-i18n="tool.volcano">🌋 Erupt Volcano</button>
+            <button class="btn tool-btn" data-tool="EARTHQUAKE" data-i18n="tool.earthquake">⚡ Fault Earthquake</button>
+            <button class="btn tool-btn" data-tool="TSUNAMI" data-i18n="tool.tsunami">🌊 Tsunami Impulse</button>
+            <button class="btn tool-btn" data-tool="STORM" data-i18n="tool.storm">🌀 Super Cyclone</button>
+            <button class="btn tool-btn" data-tool="DROUGHT" data-i18n="tool.drought">☀ Regional Drought</button>
+            <button class="btn tool-btn" data-tool="FLOOD" data-i18n="tool.flood">🌊 Mega Flood</button>
+            <button class="btn tool-btn" data-tool="METEOR" data-i18n="tool.meteor" style="grid-column: span 2;">☄️ Meteor Strike</button>
+          </div>
+
+          <div class="slider-group" style="margin-top: 10px;">
+            <div class="slider-label">
+              <span data-i18n="label.brush_radius">Brush Radius (Angular)</span>
+              <strong id="val-brush-radius">12°</strong>
+            </div>
+            <input id="slider-brush-radius" type="range" min="4" max="35" step="1" value="12" />
+          </div>
+
+          <div class="slider-group">
+            <div class="slider-label">
+              <span data-i18n="label.brush_strength">Tool / Hazard Intensity</span>
+              <strong id="val-brush-strength">85%</strong>
+            </div>
+            <input id="slider-brush-strength" type="range" min="15" max="100" step="5" value="85" />
+          </div>
+
+          <div class="control-row">
+            <label for="select-brush-falloff" data-i18n="label.brush_falloff">Brush Falloff Profile</label>
+            <select id="select-brush-falloff">
+              <option value="SMOOTH" data-i18n="falloff.SMOOTH">Smooth Cosine Bell</option>
+              <option value="LINEAR" data-i18n="falloff.LINEAR">Linear Cone</option>
+              <option value="CONSTANT" data-i18n="falloff.CONSTANT">Hard Flat Stamp</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <label for="select-brush-shape" data-i18n="label.brush_shape">Brush Footprint Shape</label>
+            <select id="select-brush-shape">
+              <option value="CIRCLE" data-i18n="shape.CIRCLE">Spherical Circle</option>
+              <option value="RING" data-i18n="shape.RING">Annular Ring / Caldera</option>
+              <option value="RIDGE" data-i18n="shape.RIDGE">Elongated Tectonic Ridge</option>
+            </select>
+          </div>
+
+          <div class="control-row">
+            <label for="select-brush-symmetry" data-i18n="label.brush_symmetry">Stroke Symmetry</label>
+            <select id="select-brush-symmetry">
+              <option value="NONE" data-i18n="symmetry.NONE">Single Stroke (None)</option>
+              <option value="LONGITUDE_MIRROR" data-i18n="symmetry.LONGITUDE_MIRROR">Mirror Longitude (±λ)</option>
+              <option value="EQUATOR_MIRROR" data-i18n="symmetry.EQUATOR_MIRROR">Mirror Equator (±φ)</option>
+            </select>
+          </div>
+
+          <div class="section-header" data-i18n="section.global_experiments">Global Planetary Experiments</div>
+          <div class="button-row-2">
+            <button class="btn global-exp-btn" data-global-exp="GLOBAL_COOLING" data-i18n="btn.exp_cooling">❄ Global Cooling Pulse</button>
+            <button class="btn global-exp-btn" data-global-exp="RAPID_GREENHOUSE" data-i18n="btn.exp_greenhouse">🔥 Rapid Greenhouse Spike</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 6px;">
+            <button class="btn btn-warn global-exp-btn" data-global-exp="ATMOSPHERE_LOSS" data-i18n="btn.exp_atmo_loss">💨 Strip Atmosphere</button>
+            <button class="btn btn-warn global-exp-btn" data-global-exp="OCEAN_LOSS" data-i18n="btn.exp_ocean_loss">🏜 Evaporate Oceans</button>
+          </div>
+          <div style="margin-top: 6px;">
+            <button class="btn btn-accent global-exp-btn" style="width: 100%;" data-global-exp="RECOVERY_EXPERIMENT" data-i18n="btn.exp_recovery">🌱 Ecological Recovery Pulse</button>
+          </div>
+
+          <div class="section-header" data-i18n="section.trigger_selected">Trigger at Selected Coordinate</div>
+          <div class="micro-note" id="selected-coord-label">Selected: 0.0° N, 0.0° E</div>
+          <div class="button-row-2" style="margin-top: 6px;">
+            <button id="btn-trigger-flora" class="btn btn-accent" data-i18n="btn.trigger_flora">🌿 Seed Life Here</button>
+            <button id="btn-trigger-meteor" class="btn btn-danger" data-i18n="btn.trigger_meteor">☄️ Meteor Here</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 6px;">
+            <button id="btn-trigger-volcano" class="btn btn-danger" data-i18n="btn.trigger_volcano">🌋 Erupt Here</button>
+            <button id="btn-trigger-quake" class="btn btn-warn" data-i18n="btn.trigger_quake">⚡ Quake Here</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 6px;">
+            <button id="btn-trigger-tsunami" class="btn btn-accent" data-i18n="btn.trigger_tsunami">🌊 Tsunami Here</button>
+            <button id="btn-trigger-storm" class="btn" data-i18n="btn.trigger_storm">🌀 Storm Here</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 6px;">
+            <button id="btn-trigger-flood" class="btn btn-accent" data-i18n="btn.trigger_flood">🌧 Flood Here</button>
+            <button id="btn-focus-coord" class="btn" data-i18n="btn.focus_coord">🎯 Focus Camera Here</button>
+          </div>
+        </section>
+
+        <!-- TAB 4: Evolution Lab & Phylogeny -->
+        <section id="tab-evolab" class="tab-content">
+          <div class="section-header" data-i18n="section.evo_chart">Real-Time Planetary & Biosphere Time-Series</div>
+          <div class="control-row">
+            <label for="select-chart-metric" data-i18n="label.chart_metric">Chart Metric</label>
+            <select id="select-chart-metric">
+              <option value="bio_fauna" data-i18n="chart.bio_fauna">Global Flora Biomass & Fauna (%)</option>
+              <option value="biodiv" data-i18n="chart.biodiv">Biodiversity (H') & Living Species</option>
+              <option value="temp_hab" data-i18n="chart.temp_hab">Surface Temp (°C) & Habitability (%)</option>
+              <option value="atmo" data-i18n="chart.atmo">Atmospheric O₂ (%) & CO₂ (ppm)</option>
+            </select>
+          </div>
+          <div class="chart-box">
+            <canvas id="evo-chart-canvas" width="295" height="110"></canvas>
+          </div>
+
+          <div class="section-header" data-i18n="section.evo_summary">Evolutionary Phylogeny & Trophic Guilds</div>
+          <div class="telemetry-grid" style="margin-bottom: 8px;">
+            <div class="stat-card">
+              <span class="stat-label" data-i18n="evo.living_species">Living Species</span>
+              <strong class="stat-value" id="evo-stat-living">0</strong>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label" data-i18n="evo.extinct_species">Extinct Lineages</span>
+              <strong class="stat-value" id="evo-stat-extinct">0</strong>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label" data-i18n="evo.shannon_index">Shannon Biodiversity (H')</span>
+              <strong class="stat-value" id="evo-stat-shannon">0.00</strong>
+            </div>
+            <div class="stat-card">
+              <span class="stat-label" data-i18n="evo.recovery_trend">Biosphere Trend</span>
+              <strong class="stat-value" id="evo-stat-trend">+0.0%</strong>
+            </div>
+          </div>
+
+          <div class="section-header" data-i18n="section.species_explorer">Species & Lineage Explorer</div>
+          <div class="control-row">
+            <input
+              id="input-species-search"
+              type="text"
+              data-i18n-placeholder="input.species_search_placeholder"
+              placeholder="Search species name, guild, or trait..."
+            />
+          </div>
+          <div id="species-explorer-list" class="species-list"></div>
+        </section>
+
+        <!-- TAB 5: Checkpoints, Save/Load & Timeline -->
+        <section id="tab-history" class="tab-content">
+          <div class="section-header" data-i18n="section.checkpoints">Checkpoints & JSON State Persistence</div>
+          <div class="inline-input-group">
+            <input id="input-checkpoint-name" type="text" data-i18n-placeholder="input.checkpoint_placeholder" placeholder="Checkpoint label..." value="Epoch Snapshot" />
+            <button id="btn-save-checkpoint" class="btn btn-accent" data-i18n="btn.save_checkpoint">+ Save</button>
+          </div>
+
+          <div class="button-row-2" style="margin-top: 8px;">
+            <button id="btn-export-json" class="btn" data-i18n="btn.export_json">⬇ Export JSON</button>
+            <label class="btn file-upload-btn">
+              <span data-i18n="btn.import_json">⬆ Import JSON</span>
+              <input id="input-import-json" type="file" accept=".json" style="display: none;" />
+            </label>
+          </div>
+
+          <div style="margin-top: 6px;">
+            <button id="btn-load-autosave" class="btn" style="width: 100%;" data-i18n="btn.load_autosave">↺ Load Last Autosave</button>
+          </div>
+
+          <div class="section-header" data-i18n="section.world_library">Saved World Library & Autosave</div>
+          <div id="checkpoint-list" class="scroll-list"></div>
+
+          <div class="section-header" data-i18n="section.event_log">Planetary Event & History Log</div>
+          <div id="event-log-list" class="scroll-list"></div>
+        </section>
+      </aside>
+
+      <!-- Right Panel: Real-Time Planetary Telemetry & Coordinate Inspector -->
+      <aside id="right-panel" class="glass-panel">
+        <div class="section-header" data-i18n="section.telemetry">Global Planetary Telemetry</div>
+        <div class="telemetry-grid">
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.mean_temp">Mean Surface Temp</span>
+            <strong class="stat-value" id="stat-mean-temp">14.8 °C (288.0 K)</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.temp_extremes">Temp Extremes</span>
+            <strong class="stat-value" id="stat-minmax-temp">-42°C .. +38°C</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.ocean_cov">Ocean Coverage</span>
+            <strong class="stat-value" id="stat-ocean-cov">70.2%</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.ice_cov">Cryosphere Ice</span>
+            <strong class="stat-value" id="stat-ice-cov">11.4%</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.biomass">Global Flora / Biomass</span>
+            <strong class="stat-value" id="stat-biomass">0.0% (Hab: 50%)</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.fauna_o2">Fauna / Atmo O₂</span>
+            <strong class="stat-value" id="stat-fauna-o2">0.0% | 0.1% O₂</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.species_biodiv">Species / Shannon H'</span>
+            <strong class="stat-value" id="stat-species-biodiv">0 alive | H'=0.00</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.ext_stress">Extinction Stress / Trend</span>
+            <strong class="stat-value" id="stat-ext-stress">0% | +0.0%</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.eff_sealevel">Effective Sea Level</span>
+            <strong class="stat-value" id="stat-eff-sealevel">0 m</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.forcing">CO₂ Forcing (ΔF)</span>
+            <strong class="stat-value" id="stat-forcing">+0.00 W/m²</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.albedo">Planetary Albedo</span>
+            <strong class="stat-value" id="stat-albedo">0.302</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.energy">Net Energy Balance</span>
+            <strong class="stat-value" id="stat-energy">+0.0 W/m²</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.hydro">Mean Humidity / Precip</span>
+            <strong class="stat-value" id="stat-hydro">58% | 2.4 mm/d</strong>
+          </div>
+          <div class="stat-card">
+            <span class="stat-label" data-i18n="stat.wind_max">Peak Wind Velocity</span>
+            <strong class="stat-value" id="stat-wind-max">18.4 m/s</strong>
+          </div>
+        </div>
+
+        <div class="section-header" data-i18n="section.honesty">Numerical Integration & Time Honesty</div>
+        <div class="honesty-box">
+          <div class="honesty-row">
+            <span data-i18n="honesty.steps_computed">Steps Computed:</span>
+            <strong id="stat-steps-computed">0</strong>
+          </div>
+          <div class="honesty-row">
+            <span data-i18n="honesty.steps_skipped">Steps Bypassed (Coarse/Analytical):</span>
+            <strong id="stat-steps-skipped">0</strong>
+          </div>
+          <div class="honesty-row">
+            <span data-i18n="honesty.perf">Render FPS / Sim Step:</span>
+            <strong id="stat-perf">60 FPS | 1.2 ms</strong>
+          </div>
+          <div class="honesty-note" id="stat-stability-note">
+            Fine Euler-CFL step (REALTIME)
+          </div>
+        </div>
+
+        <div class="section-header" data-i18n="section.inspector">Coordinate Inspector (Click Planet)</div>
+        <div class="inspector-card" id="inspector-card">
+          <div class="inspector-coord" id="insp-coord">0.00° N, 0.00° E</div>
+          <div class="inspector-badge" id="insp-domain">ABIOTIC CONTINENTAL CRUST</div>
+          <div class="inspector-rows">
+            <div class="insp-row"><span data-i18n="insp.elev">Crust Elevation:</span><strong id="insp-elev">0 m</strong></div>
+            <div class="insp-row"><span data-i18n="insp.depth">Water Depth / Alt:</span><strong id="insp-depth">0 m</strong></div>
+            <div class="insp-row"><span data-i18n="insp.temp">Surface Temp:</span><strong id="insp-temp">15.0 °C (288.2 K)</strong></div>
+            <div class="insp-row"><span data-i18n="insp.hum">Column Humidity:</span><strong id="insp-hum">50%</strong></div>
+            <div class="insp-row"><span data-i18n="insp.precip">Precipitation:</span><strong id="insp-precip">2.1 mm/day</strong></div>
+            <div class="insp-row"><span data-i18n="insp.wind">Local Wind Vector:</span><strong id="insp-wind">6.2 m/s</strong></div>
+            <div class="insp-row"><span data-i18n="insp.ice">Ice Sheet Thickness:</span><strong id="insp-ice">0.0 m</strong></div>
+            <div class="insp-row"><span data-i18n="insp.hab">Habitability / Biodiv:</span><strong id="insp-hab">0% | 0%</strong></div>
+            <div class="insp-row"><span data-i18n="insp.bio">Biomass / Fauna:</span><strong id="insp-bio">0% | 0%</strong></div>
+            <div class="insp-row"><span data-i18n="insp.species">Dominant Lineage:</span><strong id="insp-species">Abiotic / None</strong></div>
+            <div class="insp-row"><span data-i18n="insp.hazard">Geothermal / Wave:</span><strong id="insp-hazard">0 W/m² | 0.0 m</strong></div>
+          </div>
+        </div>
+      </aside>
+
+      <!-- First-Run Welcome Screen Overlay -->
+      <div id="welcome-modal" class="modal-backdrop" style="display: none;">
+        <div class="modal-card glass-panel">
+          <div class="modal-badge" data-i18n="welcome.badge">HXN GENESIS 3.0 — ULTIMATE PLANET CREATOR & LIVING WORLD SANDBOX</div>
+          <h2 class="modal-title" data-i18n="welcome.title">Forge a Planet. Sculpt Continents. Spark Evolution.</h2>
+          <p class="modal-subtitle" data-i18n="welcome.subtitle">
+            Create an abiotic world from scratch, customize its physical & orbital properties, sculpt mountains and oceans in 3D, and guide life across billions of years.
+          </p>
+          <div class="welcome-actions">
+            <button id="btn-welcome-create" class="btn btn-primary" data-i18n="welcome.btn_create">🪐 Create My World (Guided Tour)</button>
+            <button id="btn-welcome-preset" class="btn btn-accent" data-i18n="welcome.btn_preset">🌍 Explore a Preset World</button>
+            <button id="btn-welcome-skip" class="btn" data-i18n="welcome.btn_skip">⏭ Skip Tutorial</button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Non-Blocking Interactive 10-Step Guided Tutorial Banner -->
+      <div id="tutorial-banner" class="tutorial-card glass-panel" style="display: none;">
+        <div class="tutorial-header">
+          <span id="tutorial-step-badge" class="tutorial-badge">TUTORIAL STEP 1 / 10</span>
+          <button id="btn-tutorial-skip" class="btn btn-xs" data-i18n="tutorial.btn_skip">Skip Tour</button>
+        </div>
+        <h3 id="tutorial-step-title" class="tutorial-title">1. Welcome to Your 3D Planet</h3>
+        <p id="tutorial-step-body" class="tutorial-body">
+          Your planet begins as a lifeless (abiotic) world with coupled atmosphere, oceans, and crust relief.
+        </p>
+        <div class="tutorial-footer">
+          <button id="btn-tutorial-prev" class="btn" data-i18n="tutorial.btn_prev">← Back</button>
+          <div id="tutorial-dots" class="tutorial-dots"></div>
+          <button id="btn-tutorial-next" class="btn btn-primary" data-i18n="tutorial.btn_next">Next →</button>
+          <button id="btn-tutorial-finish" class="btn btn-accent" style="display: none;" data-i18n="tutorial.btn_finish">✓ Finish & Play</button>
+        </div>
+      </div>
+
+      <!-- Searchable Help & Keyboard Shortcuts Modal -->
+      <div id="help-modal" class="modal-backdrop" style="display: none;">
+        <div class="modal-card modal-wide glass-panel">
+          <div class="modal-header-row">
+            <h2 class="modal-title" data-i18n="help.modal_title">HXN GENESIS 3.0 — Controls, Shortcuts & Scientific Guide</h2>
+            <button id="btn-help-close" class="btn" data-i18n="help.btn_close">✕ Close</button>
+          </div>
+          <div class="inline-input-group" style="margin: 10px 0;">
+            <input id="input-help-search" type="text" data-i18n-placeholder="help.search_placeholder" placeholder="Search controls, keyboard shortcuts, or physics models..." />
+            <button id="btn-help-restart-tour" class="btn btn-accent" data-i18n="help.btn_restart_tour">🎓 Restart 10-Step Interactive Tutorial</button>
+          </div>
+          <div id="help-topics-list" class="help-topics-grid"></div>
+        </div>
+      </div>
+    </div>
+
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>
