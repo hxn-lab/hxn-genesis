@@ -61,6 +61,85 @@ import {
 } from './geology';
 import { GlobalExperimentEventType } from './events';
 import { migrateSnapshotToV4 } from '../persistence/worldStore';
+import {
+  applyMagneticPreset,
+  computeCellRadiationField,
+  createDefaultMagnetosphereState,
+  MagneticScenarioPreset,
+  MagnetosphereState,
+  updateMagnetosphereState
+} from './magnetism';
+import {
+  applyMitigationToThreat,
+  createDefaultSpaceWeatherState,
+  MitigationActionKind,
+  SpaceEventKind,
+  SpaceWeatherState,
+  spawnApproachingAsteroid,
+  stepSpaceWeatherQueue,
+  triggerSpaceWeatherEvent
+} from './spaceWeather';
+import {
+  createDefaultGeochemistryState,
+  generateMineralDepositField,
+  GeochemistryState,
+  runResourceExtractionExperiment,
+  stepGeochemistryReservoirs
+} from './geochemistry';
+import {
+  createDefaultNaturalHistoryState,
+  EnvironmentReconstruction,
+  NaturalHistoryState,
+  reconstructPastEnvironment,
+  recordStratigraphicLayer
+} from './naturalHistory';
+import {
+  addExplorationBookmark,
+  createDefaultExplorationState,
+  evaluateLandingSites,
+  ExplorationDiscovery,
+  ExplorationState,
+  performExpeditionScanAt,
+  renameAtlasRegion
+} from './exploration';
+import {
+  createDefaultRemoteSensingState,
+  MissionType,
+  ObservingMode,
+  RemoteSensingState,
+  runSyntheticObservation,
+  scheduleObservationMission
+} from './remoteSensing';
+import {
+  applyCivilizationPolicyAction,
+  CivilizationEntity,
+  CivilizationState,
+  createDefaultCivilizationState,
+  spawnCivilizationEntity,
+  stepCivilizationsState
+} from './civilization';
+import {
+  cancelTerraformingProject,
+  createDefaultTerraformingState,
+  launchTerraformingProject,
+  recordTerraformingBranch,
+  stepTerraformingProjects,
+  TerraformingInterventionKind,
+  TerraformingProject,
+  TerraformingState
+} from './terraforming';
+import {
+  createCustomChallengeMission,
+  createDefaultMissionSystemState,
+  evaluateMissionsState,
+  MissionSystemState
+} from './missions';
+import {
+  applyExtensionContentToParams,
+  createDefaultModdingState,
+  ModdingSystemState,
+  registerExtensionManifest
+} from './modding';
 
 export const SOLAR_CONSTANT_WM2 = 1361.0;
 export const STEFAN_BOLTZMANN_SIGMA = 5.670374419e-8;
@@ -79,26 +158,28 @@ export class WorldSimulation {
   public paused: boolean;
 
   // Primary physical state fields on spherical grid (gridWidth x gridHeight)
-  public generatedElevation: Float32Array; // Pristine procedural seed terrain (m) for RESTORE brush
-  public baseElevation: Float32Array;     // Procedural seed + sculpted base terrain (m)
-  public elevation: Float32Array;         // Current crust elevation including sculpting/erosion (m)
-  public tectonicBoundaryField: Float32Array; // Spherical Voronoi plate boundary uplift/rifting field [-1, +1]
-  public temperature: Float32Array;       // Surface temperature (K)
-  public humidity: Float32Array;          // Column relative humidity [0, 1]
-  public precipitation: Float32Array;     // Precipitation rate (mm/day)
-  public windU: Float32Array;             // Zonal wind speed (m/s, east+)
-  public windV: Float32Array;             // Meridional wind speed (m/s, north+)
-  public iceThickness: Float32Array;      // Ice sheet / sea ice thickness (m)
-  public waterWaveAnomaly: Float32Array;  // Tsunami / storm surge anomaly (m)
-  public volcanicHeat: Float32Array;      // Local geothermal / lava flux (W/m^2)
-  public sediment: Float32Array;          // Eroded regolith/sediment depth (m)
+  public generatedElevation: Float32Array;
+  public baseElevation: Float32Array;
+  public elevation: Float32Array;
+  public tectonicBoundaryField: Float32Array;
+  public temperature: Float32Array;
+  public humidity: Float32Array;
+  public precipitation: Float32Array;
+  public windU: Float32Array;
+  public windV: Float32Array;
+  public iceThickness: Float32Array;
+  public waterWaveAnomaly: Float32Array;
+  public volcanicHeat: Float32Array;
+  public sediment: Float32Array;
 
-  // Biosphere & Evolution spatial fields (0 on initial abiotic generation unless scenario specifies)
-  public habitability: Float32Array;      // Environmental suitability for life [0, 1]
-  public biomass: Float32Array;           // Microbes / phytoplankton / terrestrial flora density [0, 1]
-  public fauna: Float32Array;             // Marine / terrestrial animal ecosystem density [0, 1]
-  public biodiversity: Float32Array;      // Local species richness / ecological diversity [0, 1]
-  public extinctionImpact: Float32Array;  // Recent catastrophe / extinction stress scar [0, 1]
+  // Biosphere & Evolution spatial fields
+  public habitability: Float32Array;
+  public biomass: Float32Array;
+  public fauna: Float32Array;
+  public biodiversity: Float32Array;
+  public extinctionImpact: Float32Array;
+  public radiationField: Float32Array;
+  public mineralField: Float32Array;
 
   // Scratch buffers to avoid per-step allocations
   private tempNext: Float32Array;
@@ -123,9 +204,19 @@ export class WorldSimulation {
   public eventLog: SimEventLogEntry[] = [];
   public telemetry: GlobalTelemetry;
 
+  public magnetosphere: MagnetosphereState;
+  public spaceWeather: SpaceWeatherState;
+  public geochemistry: GeochemistryState;
+  public naturalHistory: NaturalHistoryState;
+  public exploration: ExplorationState;
+  public remoteSensing: RemoteSensingState;
+  public civilization: CivilizationState;
+  public terraforming: TerraformingState;
+  public missions: MissionSystemState;
+  public modding: ModdingSystemState;
+
   private previousBiomassFraction = 0;
 
-  // Undo / Redo stacks (stores compact snapshots)
   private undoStack: SerializedWorldSnapshot[] = [];
   private redoStack: SerializedWorldSnapshot[] = [];
   private maxUndoDepth = 25;
@@ -159,6 +250,8 @@ export class WorldSimulation {
     this.fauna = new Float32Array(this.numCells);
     this.biodiversity = new Float32Array(this.numCells);
     this.extinctionImpact = new Float32Array(this.numCells);
+    this.radiationField = new Float32Array(this.numCells);
+    this.mineralField = new Float32Array(this.numCells);
 
     this.tempNext = new Float32Array(this.numCells);
     this.humNext = new Float32Array(this.numCells);
@@ -197,6 +290,17 @@ export class WorldSimulation {
         this.totalAreaWeight += cosLat;
       }
     }
+
+    this.magnetosphere = createDefaultMagnetosphereState();
+    this.spaceWeather = createDefaultSpaceWeatherState();
+    this.geochemistry = createDefaultGeochemistryState();
+    this.naturalHistory = createDefaultNaturalHistoryState();
+    this.exploration = createDefaultExplorationState();
+    this.remoteSensing = createDefaultRemoteSensingState();
+    this.civilization = createDefaultCivilizationState();
+    this.terraforming = createDefaultTerraformingState();
+    this.missions = createDefaultMissionSystemState(this.params.seed);
+    this.modding = createDefaultModdingState();
 
     this.evolutionEngine = new EvolutionEngine(this.params.seed);
     this.telemetry = this.createEmptyTelemetry();
@@ -340,10 +444,34 @@ export class WorldSimulation {
     }
 
     this.activeHazards = [];
+    this.magnetosphere = createDefaultMagnetosphereState();
+    this.spaceWeather = createDefaultSpaceWeatherState();
+    this.geochemistry = createDefaultGeochemistryState();
+    this.naturalHistory = createDefaultNaturalHistoryState();
+    this.exploration = createDefaultExplorationState();
+    this.remoteSensing = createDefaultRemoteSensingState();
+    this.civilization = createDefaultCivilizationState();
+    this.terraforming = createDefaultTerraformingState();
+    this.missions = createDefaultMissionSystemState(seed);
+    if (!this.modding) {
+      this.modding = createDefaultModdingState();
+    }
+
+    generateMineralDepositField(
+      seed,
+      this.numCells,
+      this.cellNx,
+      this.cellNy,
+      this.cellNz,
+      this.tectonicBoundaryField,
+      this.volcanicHeat,
+      this.mineralField
+    );
+
     this.initializeEquilibriumClimate();
+    this.syncMagnetosphereAndRadiation();
     this.computeHabitabilityField(this.params.seaLevelMeters);
 
-    // If the user explicitly selected one of the pre-seeded evolutionary scenario presets:
     if (this.params.preset === 'Mass Extinction Testbed' || this.params.preset === 'Isolated Evolution') {
       this.seedScenarioBiosphere(true);
     } else if (this.params.preset === 'Low-Oxygen Biospheres') {
@@ -351,6 +479,8 @@ export class WorldSimulation {
     }
 
     this.updateTelemetry('Initialized deterministic world from seed');
+    this.refreshExplorationLandingSites();
+    this.recordStratigraphySnapshot('Planetary Crust & Primary Atmosphere Formation');
     this.recordTelemetryHistoryPoint();
     this.logEvent('SYSTEM', `Generated world with seed "${seed}" (${this.params.preset})`);
   }
@@ -1252,9 +1382,9 @@ export class WorldSimulation {
     advanceSafeTime(this.timeState, deltaSimSecondsSci, actualSteps, nominalFineDt);
     this.updateSolarGeometry();
 
-    // Advance evolutionary population & trait dynamics
     const dtYears = Math.max(1e-4, sciToNumber(deltaSimSecondsSci) / SECONDS_PER_YEAR);
     this.advanceEvolutionaryStep(dtYears);
+    this.advanceExtendedSubsystems(dtYears);
 
     this.updateTelemetry(this.telemetry.lastStepStabilityNote);
     if (this.timeState.stepsComputed % 8 === 0 || mode === 'ANALYTICAL_ADVANCE' || mode === 'VISUAL_TIME_WARP') {
@@ -1954,14 +2084,20 @@ export class WorldSimulation {
       })),
       telemetryHistory: this.telemetryHistory.map((h) => ({ ...h })),
       activeHazards: this.activeHazards.map((h) => ({ ...h })),
-      eventLog: this.eventLog.slice(0, 60).map((e) => ({ ...e }))
+      eventLog: this.eventLog.slice(0, 60).map((e) => ({ ...e })),
+      magnetosphere: JSON.parse(JSON.stringify(this.magnetosphere)),
+      spaceWeather: JSON.parse(JSON.stringify(this.spaceWeather)),
+      geochemistry: JSON.parse(JSON.stringify(this.geochemistry)),
+      naturalHistory: JSON.parse(JSON.stringify(this.naturalHistory)),
+      exploration: JSON.parse(JSON.stringify(this.exploration)),
+      remoteSensing: JSON.parse(JSON.stringify(this.remoteSensing)),
+      civilization: JSON.parse(JSON.stringify(this.civilization)),
+      terraforming: JSON.parse(JSON.stringify(this.terraforming)),
+      missions: JSON.parse(JSON.stringify(this.missions)),
+      modding: JSON.parse(JSON.stringify(this.modding))
     };
   }
 
-  /**
-   * Restores simulation state from a serialized snapshot with full validation and backward
-   * compatibility for v1/v2/v3/v4 snapshots. Throws descriptive errors on corrupted data.
-   */
   public loadSnapshot(rawSnap: SerializedWorldSnapshot, recordUndo = true): void {
     const snap = migrateSnapshotToV4(rawSnap);
     if (snap.gridWidth !== this.gridWidth || snap.gridHeight !== this.gridHeight) {
@@ -2061,8 +2197,367 @@ export class WorldSimulation {
     this.activeHazards = Array.isArray(snap.activeHazards) ? snap.activeHazards.map((h) => ({ ...h })) : [];
     this.eventLog = Array.isArray(snap.eventLog) ? snap.eventLog.map((e) => ({ ...e })) : [];
 
+    this.magnetosphere = snap.magnetosphere
+      ? JSON.parse(JSON.stringify(snap.magnetosphere))
+      : createDefaultMagnetosphereState();
+    this.spaceWeather = snap.spaceWeather
+      ? JSON.parse(JSON.stringify(snap.spaceWeather))
+      : createDefaultSpaceWeatherState();
+    this.geochemistry = snap.geochemistry
+      ? JSON.parse(JSON.stringify(snap.geochemistry))
+      : createDefaultGeochemistryState();
+    this.naturalHistory = snap.naturalHistory
+      ? JSON.parse(JSON.stringify(snap.naturalHistory))
+      : createDefaultNaturalHistoryState();
+    this.exploration = snap.exploration
+      ? JSON.parse(JSON.stringify(snap.exploration))
+      : createDefaultExplorationState();
+    this.remoteSensing = snap.remoteSensing
+      ? JSON.parse(JSON.stringify(snap.remoteSensing))
+      : createDefaultRemoteSensingState();
+    this.civilization = snap.civilization
+      ? JSON.parse(JSON.stringify(snap.civilization))
+      : createDefaultCivilizationState();
+    this.terraforming = snap.terraforming
+      ? JSON.parse(JSON.stringify(snap.terraforming))
+      : createDefaultTerraformingState();
+    this.missions = snap.missions
+      ? JSON.parse(JSON.stringify(snap.missions))
+      : createDefaultMissionSystemState(this.params.seed);
+    this.modding = snap.modding
+      ? JSON.parse(JSON.stringify(snap.modding))
+      : createDefaultModdingState();
+
+    generateMineralDepositField(
+      this.params.seed,
+      this.numCells,
+      this.cellNx,
+      this.cellNy,
+      this.cellNz,
+      this.tectonicBoundaryField,
+      this.volcanicHeat,
+      this.mineralField
+    );
+    this.syncMagnetosphereAndRadiation();
     this.updateAtmosphericWinds();
     this.computeHabitabilityField(this.params.seaLevelMeters);
     this.updateTelemetry('Restored world state from snapshot');
+  }
+
+  public syncMagnetosphereAndRadiation(): void {
+    const p = this.params.planet;
+    const g = this.params.geology;
+    this.magnetosphere = updateMagnetosphereState(this.magnetosphere, {
+      coreHeat: g?.internalHeat ?? 1.0,
+      mantleActivity: g?.mantleActivity ?? 1.0,
+      rotationHours: p?.rotationHours ?? 24,
+      massEarth: p?.massEarth ?? 1.0,
+      radiusKm: p?.radiusKm ?? 6371,
+      pressureBar: this.params.pressureBar ?? 1.0,
+      orbitalDistanceAU: p?.orbitalDistanceAU ?? 1.0,
+      stellarActivityLevel: this.spaceWeather.stellarActivityMultiplier
+    });
+    computeCellRadiationField(
+      this.magnetosphere,
+      this.cellLatRad,
+      this.elevation,
+      this.params.seaLevelMeters,
+      this.params.pressureBar ?? 1.0,
+      this.radiationField
+    );
+  }
+
+  public setMagneticScenarioPreset(preset: MagneticScenarioPreset): MagnetosphereState {
+    this.magnetosphere = applyMagneticPreset(this.magnetosphere, preset);
+    this.syncMagnetosphereAndRadiation();
+    this.logEvent('GOD_ACTION', `Applied magnetic field preset: ${preset}`);
+    return this.magnetosphere;
+  }
+
+  public advanceExtendedSubsystems(dtYears: number): void {
+    const simTimeLabel = formatTimeBreakdown(this.timeState).years;
+
+    stepTerraformingProjects(
+      this.terraforming,
+      this.params,
+      this.telemetry,
+      this.magnetosphere,
+      dtYears
+    );
+
+    this.syncMagnetosphereAndRadiation();
+
+    if (this.geochemistry.enabled) {
+      stepGeochemistryReservoirs(
+        this.geochemistry,
+        dtYears,
+        this.telemetry.meanSurfaceTempK,
+        this.telemetry.meanPrecipitationMmDay,
+        this.params.volcanicActivity,
+        this.telemetry.globalBiomassFraction
+      );
+    }
+
+    const impacted = stepSpaceWeatherQueue(
+      this.spaceWeather,
+      dtYears,
+      this.params.seed,
+      simTimeLabel
+    );
+    for (const imp of impacted) {
+      this.triggerHazard('METEOR', imp.targetLatDeg, imp.targetLonDeg, Math.min(1.0, 0.35 + imp.diameterMeters / 4000));
+      this.recordStratigraphySnapshot(`Asteroid Impact: ${imp.name}`);
+    }
+
+    const civDelta = stepCivilizationsState(this.civilization, {
+      seed: this.params.seed,
+      stepCount: this.timeState.stepsComputed,
+      dtYears,
+      simTimeLabel,
+      params: this.params,
+      telemetry: this.telemetry,
+      speciesLineages: this.speciesLineages,
+      habitability: this.habitability,
+      elevation: this.elevation,
+      cellLatRad: this.cellLatRad,
+      cellLonRad: this.cellLonRad
+    });
+    if (civDelta.co2DeltaPpm > 0) {
+      this.params.co2Ppm = Math.min(10000, this.params.co2Ppm + civDelta.co2DeltaPpm);
+    }
+
+    if (this.timeState.stepsComputed % 16 === 0 && dtYears >= 10) {
+      this.recordStratigraphySnapshot();
+    }
+
+    const maxCivTech = this.civilization.civilizations.reduce(
+      (max, c) => (c.active ? Math.max(max, c.techIndex) : max),
+      0
+    );
+    evaluateMissionsState(this.missions, this.telemetry, this.timeState.stepsComputed, {
+      maxCivTechIndex: maxCivTech,
+      discoveryCount: this.exploration.discoveries.length
+    });
+  }
+
+  public spawnAsteroidThreat(opts?: Parameters<typeof spawnApproachingAsteroid>[2]) {
+    const obj = spawnApproachingAsteroid(this.spaceWeather, this.params.seed, opts);
+    this.logEvent('HAZARD', `Detected approaching object ${obj.name} (${obj.diameterMeters} m, ${Math.round(obj.impactProbability * 100)}% risk).`);
+    return obj;
+  }
+
+  public mitigateAsteroidThreat(threatId: string, method: MitigationActionKind) {
+    const res = applyMitigationToThreat(this.spaceWeather, threatId, method);
+    if (res.success) {
+      this.logEvent('GOD_ACTION', res.note);
+    }
+    return res;
+  }
+
+  public triggerSpaceEvent(kind: Exclude<SpaceEventKind, 'ASTEROID_APPROACH'>, intensity = 1.0) {
+    const simTimeLabel = formatTimeBreakdown(this.timeState).years;
+    const res = triggerSpaceWeatherEvent(
+      this.spaceWeather,
+      kind,
+      simTimeLabel,
+      this.magnetosphere.dipoleMomentEarths,
+      this.params.pressureBar ?? 1.0,
+      intensity
+    );
+    this.params.pressureBar = Math.max(0.006, (this.params.pressureBar ?? 1.0) + res.pressureDeltaBar);
+    this.params.solarLuminosity = Math.max(0.2, Math.min(2.5, this.params.solarLuminosity + res.luminosityMultiplierDelta));
+    this.syncMagnetosphereAndRadiation();
+    this.updateTelemetry(`Space weather event: ${kind}`);
+    this.logEvent('HAZARD', res.report.summary);
+    return res;
+  }
+
+  public extractPlanetaryResource(
+    resourceType: 'IRON_ORE' | 'PHOSPHATE' | 'HYDROCARBON_CARBON' | 'SULFIDE_MINERAL',
+    amountGt: number,
+    recycledFraction = 0.25
+  ) {
+    const res = runResourceExtractionExperiment(
+      this.geochemistry,
+      this.mineralField,
+      resourceType,
+      amountGt,
+      recycledFraction
+    );
+    if (res.co2ReleasedPpm > 0) {
+      this.params.co2Ppm = Math.min(10000, this.params.co2Ppm + res.co2ReleasedPpm);
+    }
+    this.updateTelemetry(`Extracted ${resourceType}`);
+    this.logEvent('GOD_ACTION', `Resource extraction (${resourceType}): ${res.extractedGt} Gt, +${res.co2ReleasedPpm} ppm CO2.`);
+    return res;
+  }
+
+  public recordStratigraphySnapshot(eventMarker?: string) {
+    const ageLabel = formatTimeBreakdown(this.timeState).years;
+    return recordStratigraphicLayer(this.naturalHistory, {
+      step: this.timeState.stepsComputed,
+      ageYearsLabel: ageLabel,
+      meanTempC: this.telemetry.meanSurfaceTempC,
+      co2Ppm: this.params.co2Ppm,
+      o2Percent: this.telemetry.oxygenPercent,
+      oceanFraction: this.telemetry.oceanCoverageFraction,
+      iceFraction: this.telemetry.iceCoverageFraction,
+      volcanicActivity: this.params.volcanicActivity,
+      eventMarker,
+      candidateSpecies: this.speciesLineages.map((s) => ({
+        id: s.id,
+        name: s.name,
+        guild: s.guild,
+        dominantBiome: s.dominantBiome,
+        isExtinct: s.isExtinct
+      }))
+    });
+  }
+
+  public reconstructLayerEnvironment(layerId: string, useApproximateProxy = false): EnvironmentReconstruction | null {
+    return reconstructPastEnvironment(this.naturalHistory, layerId, useApproximateProxy);
+  }
+
+  public refreshExplorationLandingSites() {
+    this.exploration.landingCandidates = evaluateLandingSites(
+      this.gridWidth,
+      this.gridHeight,
+      this.elevation,
+      this.temperature,
+      this.habitability,
+      this.radiationField,
+      this.mineralField,
+      this.params.seaLevelMeters
+    );
+    return this.exploration.landingCandidates;
+  }
+
+  public scanSurfaceAt(latDeg: number, lonDeg: number): ExplorationDiscovery {
+    const idx = this.latLonToCellIndex(latDeg, lonDeg);
+    const simTimeFormatted = formatTimeBreakdown(this.timeState).years;
+    const disc = performExpeditionScanAt(this.exploration, {
+      latDeg,
+      lonDeg,
+      simTimeFormatted,
+      elevationMeters: this.elevation[idx],
+      temperatureC: this.temperature[idx] - FREEZING_POINT_K,
+      habitability: this.habitability[idx],
+      biomass: this.biomass[idx],
+      mineralRichness: this.mineralField[idx],
+      hasFossils: this.naturalHistory.fossils.length > 0,
+      impactCount: this.spaceWeather.postEventReports.filter((r) => r.kind === 'ASTEROID_APPROACH').length,
+      biome: this.classifyCellBiome(idx)
+    });
+    this.logEvent('SYSTEM', `Expedition Discovery [${disc.epistemicClass}]: ${disc.title}`, latDeg, lonDeg);
+    return disc;
+  }
+
+  public addSurfaceBookmark(label: string, latDeg: number, lonDeg: number, notes = '') {
+    return addExplorationBookmark(this.exploration, label, latDeg, lonDeg, notes);
+  }
+
+  public renameRegionInAtlas(regionId: string, newName: string): boolean {
+    return renameAtlasRegion(this.exploration, regionId, newName);
+  }
+
+  public performRemoteSensingObservation(mode?: ObservingMode) {
+    if (mode) {
+      this.remoteSensing.activeMode = mode;
+    }
+    const p = this.params.planet;
+    return runSyntheticObservation(this.remoteSensing, this.params.seed, {
+      radiusKm: p?.radiusKm ?? 6371,
+      massEarth: p?.massEarth ?? 1.0,
+      meanTempK: this.telemetry.meanSurfaceTempK,
+      pressureBar: this.params.pressureBar ?? 1.0,
+      o2Percent: this.telemetry.oxygenPercent,
+      co2Ppm: this.params.co2Ppm,
+      meanHumidity: this.telemetry.meanHumidity,
+      albedo: this.telemetry.planetaryAlbedo,
+      starType: p?.starType ?? 'G',
+      orbitalDistanceAU: p?.orbitalDistanceAU ?? 1.0,
+      globalBiomassFraction: this.telemetry.globalBiomassFraction
+    });
+  }
+
+  public planRemoteSensingMission(name: string, missionType: MissionType, mode: ObservingMode) {
+    this.performRemoteSensingObservation(mode);
+    return scheduleObservationMission(this.remoteSensing, name, missionType, mode);
+  }
+
+  public spawnCivilizationAt(latDeg = 15, lonDeg = 20, customName?: string, initialTechIndex = 0.2): CivilizationEntity {
+    const cellIndex = this.latLonToCellIndex(latDeg, lonDeg);
+    const simTimeLabel = formatTimeBreakdown(this.timeState).years;
+    const civ = spawnCivilizationEntity(this.civilization, {
+      originType: 'EXPLICIT_INTERVENTION',
+      cellIndex,
+      latDeg,
+      lonDeg,
+      simTimeLabel,
+      customName,
+      initialTechIndex
+    });
+    this.logEvent('GOD_ACTION', `Spawned civilization "${civ.name}" at (${latDeg.toFixed(1)}°, ${lonDeg.toFixed(1)}°).`, latDeg, lonDeg);
+    return civ;
+  }
+
+  public applyCivilizationPolicy(
+    civId: string,
+    policy: 'ECOLOGICAL_RESTORATION' | 'ACCELERATE_RENEWABLES' | 'DIPLOMATIC_ACCORD' | 'REVIVE_COLLAPSED'
+  ): boolean {
+    const simTimeLabel = formatTimeBreakdown(this.timeState).years;
+    const ok = applyCivilizationPolicyAction(this.civilization, this.params, civId, policy, simTimeLabel);
+    if (ok) {
+      this.updateTelemetry(`Applied civilization policy: ${policy}`);
+      this.logEvent('GOD_ACTION', `Civilization policy applied: ${policy}`);
+    }
+    return ok;
+  }
+
+  public startTerraformingProject(
+    kind: TerraformingInterventionKind,
+    intensity: number,
+    durationYears = 100_000
+  ): TerraformingProject {
+    const proj = launchTerraformingProject(
+      this.terraforming,
+      this.params,
+      this.telemetry,
+      kind,
+      intensity,
+      durationYears
+    );
+    if (proj.status === 'ACTIVE') {
+      this.logEvent('GOD_ACTION', `Started terraforming project: ${proj.title}`);
+    }
+    return proj;
+  }
+
+  public cancelTerraforming(projectId: string): boolean {
+    return cancelTerraformingProject(this.terraforming, projectId);
+  }
+
+  public recordTerraformingBranchSnapshot(label: string) {
+    const simTimeLabel = formatTimeBreakdown(this.timeState).years;
+    return recordTerraformingBranch(this.terraforming, this.params, this.telemetry, label, simTimeLabel);
+  }
+
+  public addCustomMission(config: Parameters<typeof createCustomChallengeMission>[3]) {
+    return createCustomChallengeMission(this.missions, this.params.seed, this.timeState.stepsComputed, config);
+  }
+
+  public registerModExtension(rawManifest: unknown) {
+    return registerExtensionManifest(this.modding, rawManifest);
+  }
+
+  public applyModExtension(extensionId: string) {
+    const res = applyExtensionContentToParams(this.modding, this.params, extensionId);
+    if (res.applied) {
+      this.initializeEquilibriumClimate();
+      this.computeHabitabilityField(this.params.seaLevelMeters);
+      this.updateTelemetry(res.summary);
+      this.logEvent('GOD_ACTION', res.summary);
+    }
+    return res;
   }
 }

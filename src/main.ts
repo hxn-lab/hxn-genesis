@@ -11,6 +11,25 @@ import { PresetName, VisualQualityPreset } from './sim/types';
 import { WorldSimulation } from './sim/world';
 import { resolveShortcutAction } from './ui/shortcuts';
 import { TUTORIAL_STEPS, TutorialController } from './ui/tutorial';
+import {
+  buildCausalAttributionChains,
+  computeMetricCorrelation,
+  exportWorldAnalyticsCsv,
+  runMonteCarloEnsemble
+} from './sim/analytics';
+import { generateProceduralMission } from './sim/missions';
+import { BUILTIN_EXAMPLE_EXTENSION } from './sim/modding';
+import { MagneticScenarioPreset } from './sim/magnetism';
+import { ObservingMode } from './sim/remoteSensing';
+import { TerraformingInterventionKind } from './sim/terraforming';
+import {
+  ColorVisionPaletteMode,
+  CommandPaletteAction,
+  createInitialWorkflowState,
+  DEFAULT_GUIDED_TOUR_STOPS,
+  filterCommandPaletteActions,
+  UserWorkflowState
+} from './ui/workflows';
 
 type ClickToolMode =
   | 'INSPECT'
@@ -69,6 +88,7 @@ class HxnGenesisApp {
   private speciesSearchQuery = '';
   private helpSearchQuery = '';
   private chartMetricMode: 'bio_fauna' | 'biodiv' | 'temp_hab' | 'atmo' = 'bio_fauna';
+  public workflowState: UserWorkflowState = createInitialWorkflowState();
 
   private lastFrameTime = performance.now();
   private fpsFrameCount = 0;
@@ -105,6 +125,7 @@ class HxnGenesisApp {
 
     this.renderer.setSelectionMarker(this.selectedLat, this.selectedLon);
     this.bindUIEvents(viewport);
+    this.bindFrontierAndScienceEvents();
     this.syncUIModeDom();
     this.syncSlidersFromParams();
     this.renderTutorialState();
@@ -1539,8 +1560,8 @@ class HxnGenesisApp {
 
     this.renderEvoChart();
     this.renderSpeciesExplorer();
+    this.renderFrontierAndSciencePanels();
 
-    // Event log
     const logContainer = document.getElementById('event-log-list')!;
     logContainer.innerHTML = '';
     this.world.eventLog.slice(0, 20).forEach((ev) => {
@@ -1551,6 +1572,475 @@ class HxnGenesisApp {
       item.innerHTML = `<div><strong>[${cat}]</strong> ${msg}<div class="list-item-meta">${ev.simTimeFormatted}</div></div>`;
       logContainer.appendChild(item);
     });
+  }
+
+  private getCommandPaletteActions(): CommandPaletteAction[] {
+    const switchTab = (tabId: string) => {
+      document.querySelectorAll<HTMLButtonElement>('.tab-btn').forEach((b) => {
+        b.classList.toggle('active', b.dataset.tab === tabId);
+      });
+      document.querySelectorAll<HTMLElement>('.tab-content').forEach((s) => {
+        s.classList.toggle('active', s.id === tabId);
+      });
+    };
+    return [
+      {
+        id: 'cmd-tab-explore',
+        titleEn: 'Open Planetary Frontier & Terraforming Tab',
+        titleVi: 'Mở Tab Thám Hiểm, Văn Minh & Terraforming',
+        category: 'NAVIGATION',
+        keywords: ['explore', 'frontier', 'terraforming', 'civilization', 'rover'],
+        run: () => switchTab('tab-explore')
+      },
+      {
+        id: 'cmd-tab-science',
+        titleEn: 'Open Planetary Science Lab (Geochemistry, Space Weather, Spectra)',
+        titleVi: 'Mở Phòng Lab Khoa Học (Địa Hóa, Thời Tiết Vũ Trụ, Quang Phổ)',
+        category: 'NAVIGATION',
+        keywords: ['science', 'geochemistry', 'magnetosphere', 'spectrum', 'stratigraphy', 'analytics'],
+        run: () => switchTab('tab-science')
+      },
+      {
+        id: 'cmd-toggle-magnetosphere',
+        titleEn: 'Toggle 3D Magnetosphere & Solar-Wind Field Lines',
+        titleVi: 'Bật/Tắt Đường Sức Từ Quyển & Gió Sao 3D',
+        category: 'VISUALIZATION',
+        keywords: ['magnetosphere', 'dipole', 'radiation', '3d'],
+        run: () => {
+          this.renderer.toggleMagnetosphere();
+          this.renderer.syncWithSimulation(this.world);
+        }
+      },
+      {
+        id: 'cmd-scan-expedition',
+        titleEn: 'Land Expedition Rover & Scan Selected Coordinate',
+        titleVi: 'Hạ Cánh Tàu Thám Hiểm & Quét Tọa Độ Đang Chọn',
+        category: 'SCIENCE',
+        keywords: ['rover', 'scan', 'discovery', 'fossil', 'biosignature'],
+        run: () => {
+          this.world.scanSurfaceAt(this.selectedLat, this.selectedLon);
+          this.renderer.syncWithSimulation(this.world);
+          this.updateUIReadouts();
+        }
+      },
+      {
+        id: 'cmd-spawn-civ',
+        titleEn: 'Found Intelligent Civilization at Selected Coordinate',
+        titleVi: 'Khởi Tạo Nền Văn Minh Tại Tọa Độ Đang Chọn',
+        category: 'SIMULATION',
+        keywords: ['civilization', 'city', 'settlement', 'technology'],
+        run: () => {
+          this.world.spawnCivilizationAt(this.selectedLat, this.selectedLon);
+          this.renderer.syncWithSimulation(this.world);
+          this.updateUIReadouts();
+        }
+      },
+      {
+        id: 'cmd-high-contrast',
+        titleEn: 'Toggle High-Contrast Accessibility Theme',
+        titleVi: 'Bật/Tắt Giao Diện Độ Tương Phản Cao',
+        category: 'ACCESSIBILITY',
+        keywords: ['contrast', 'accessibility', 'theme'],
+        run: () => {
+          this.workflowState.highContrast = !this.workflowState.highContrast;
+          document.body.classList.toggle('high-contrast', this.workflowState.highContrast);
+        }
+      }
+    ];
+  }
+
+  private renderCommandPaletteList(query = ''): void {
+    const listEl = document.getElementById('cmd-actions-list');
+    if (!listEl) return;
+    listEl.innerHTML = '';
+    const lang = i18n.getLanguage();
+    const actions = filterCommandPaletteActions(this.getCommandPaletteActions(), query, lang);
+    for (const act of actions) {
+      const row = document.createElement('div');
+      row.className = 'cmd-item';
+      row.innerHTML = `<span>${lang === 'vi' ? act.titleVi : act.titleEn}</span><span class="list-item-meta">${act.category}</span>`;
+      row.addEventListener('click', () => {
+        act.run();
+        const modal = document.getElementById('cmd-palette-modal');
+        if (modal) modal.style.display = 'none';
+      });
+      listEl.appendChild(row);
+    }
+  }
+
+  private bindFrontierAndScienceEvents(): void {
+    const cmdModal = document.getElementById('cmd-palette-modal');
+    const cmdSearch = document.getElementById('input-cmd-search') as HTMLInputElement | null;
+
+    const openCmdPalette = () => {
+      if (!cmdModal) return;
+      cmdModal.style.display = 'flex';
+      if (cmdSearch) {
+        cmdSearch.value = '';
+        cmdSearch.focus();
+      }
+      this.renderCommandPaletteList('');
+    };
+
+    document.getElementById('btn-cmd-palette')?.addEventListener('click', openCmdPalette);
+    document.getElementById('btn-cmd-close')?.addEventListener('click', () => {
+      if (cmdModal) cmdModal.style.display = 'none';
+    });
+    cmdSearch?.addEventListener('input', () => {
+      this.renderCommandPaletteList(cmdSearch.value);
+    });
+
+    window.addEventListener('keydown', (e) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'k') {
+        e.preventDefault();
+        openCmdPalette();
+      } else if (e.key === 'Escape' && cmdModal && cmdModal.style.display !== 'none') {
+        cmdModal.style.display = 'none';
+      }
+    });
+
+    const btnMag = document.getElementById('btn-toggle-magnetosphere');
+    btnMag?.addEventListener('click', () => {
+      const on = this.renderer.toggleMagnetosphere();
+      btnMag.classList.toggle('active', on);
+      this.renderer.syncWithSimulation(this.world);
+    });
+
+    document.getElementById('btn-presentation-tour')?.addEventListener('click', () => {
+      const stop = DEFAULT_GUIDED_TOUR_STOPS[this.workflowState.currentTourIndex % DEFAULT_GUIDED_TOUR_STOPS.length];
+      this.workflowState.currentTourIndex = (this.workflowState.currentTourIndex + 1) % DEFAULT_GUIDED_TOUR_STOPS.length;
+      this.selectedLat = stop.latDeg;
+      this.selectedLon = stop.lonDeg;
+      this.renderer.setSelectionMarker(stop.latDeg, stop.lonDeg);
+      this.renderer.focusOnLatLon(stop.latDeg, stop.lonDeg);
+      this.world.logEvent('SYSTEM', `Presentation Tour: ${stop.titleEn} — ${stop.captionEn}`, stop.latDeg, stop.lonDeg);
+      this.updateUIReadouts();
+    });
+
+    const camSpeedSlider = document.getElementById('slider-cam-speed') as HTMLInputElement | null;
+    camSpeedSlider?.addEventListener('input', () => {
+      const v = parseFloat(camSpeedSlider.value);
+      this.world.exploration.cameraSpeedMultiplier = v;
+      this.renderer.setCameraSpeedMultiplier(v);
+      const valEl = document.getElementById('val-cam-speed');
+      if (valEl) valEl.textContent = `${v.toFixed(1)}x`;
+    });
+
+    document.getElementById('btn-eval-landing-sites')?.addEventListener('click', () => {
+      this.world.refreshExplorationLandingSites();
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-scan-expedition')?.addEventListener('click', () => {
+      this.world.scanSurfaceAt(this.selectedLat, this.selectedLon);
+      this.renderer.syncWithSimulation(this.world);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-add-bookmark')?.addEventListener('click', () => {
+      const inp = document.getElementById('input-bookmark-label') as HTMLInputElement | null;
+      const label = inp?.value.trim() || `Marker (${this.selectedLat.toFixed(1)}°, ${this.selectedLon.toFixed(1)}°)`;
+      this.world.addSurfaceBookmark(label, this.selectedLat, this.selectedLon);
+      if (inp) inp.value = '';
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-spawn-civ')?.addEventListener('click', () => {
+      this.world.spawnCivilizationAt(this.selectedLat, this.selectedLon);
+      this.renderer.syncWithSimulation(this.world);
+      this.updateUIReadouts();
+    });
+
+    const applyCivPolicy = (policy: 'ECOLOGICAL_RESTORATION' | 'ACCELERATE_RENEWABLES' | 'DIPLOMATIC_ACCORD') => {
+      const firstId = this.world.civilization.civilizations[0]?.id ?? '';
+      if (firstId) {
+        this.world.applyCivilizationPolicy(firstId, policy);
+        this.renderer.syncWithSimulation(this.world);
+        this.updateUIReadouts();
+      }
+    };
+    document.getElementById('btn-civ-renewables')?.addEventListener('click', () => applyCivPolicy('ACCELERATE_RENEWABLES'));
+    document.getElementById('btn-civ-restore')?.addEventListener('click', () => applyCivPolicy('ECOLOGICAL_RESTORATION'));
+    document.getElementById('btn-civ-accord')?.addEventListener('click', () => applyCivPolicy('DIPLOMATIC_ACCORD'));
+
+    const tfSlider = document.getElementById('slider-terraform-intensity') as HTMLInputElement | null;
+    tfSlider?.addEventListener('input', () => {
+      const v = parseFloat(tfSlider.value);
+      const el = document.getElementById('val-terraform-intensity');
+      if (el) el.textContent = `${v >= 0 ? '+' : ''}${v.toFixed(2)}`;
+    });
+
+    document.getElementById('btn-launch-terraform')?.addEventListener('click', () => {
+      const kindSel = document.getElementById('select-terraform-kind') as HTMLSelectElement | null;
+      const kind = (kindSel?.value ?? 'ATMOSPHERE_PROCESSING') as TerraformingInterventionKind;
+      const intensity = tfSlider ? parseFloat(tfSlider.value) : 0.6;
+      this.world.startTerraformingProject(kind, intensity, 50_000);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-branch-terraform')?.addEventListener('click', () => {
+      this.world.recordTerraformingBranchSnapshot(`Branch-${this.world.terraforming.branches.length + 1}`);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-new-proc-mission')?.addEventListener('click', () => {
+      const m = generateProceduralMission(this.world.params.seed, this.world.timeState.stepsComputed + this.world.missions.activeMissions.length);
+      this.world.missions.activeMissions.unshift(m);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-apply-example-mod')?.addEventListener('click', () => {
+      this.world.applyModExtension(BUILTIN_EXAMPLE_EXTENSION.id);
+      this.syncSlidersFromParams();
+      this.renderer.syncWithSimulation(this.world);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-toggle-contrast')?.addEventListener('click', () => {
+      this.workflowState.highContrast = !this.workflowState.highContrast;
+      document.body.classList.toggle('high-contrast', this.workflowState.highContrast);
+    });
+
+    const cvSelect = document.getElementById('select-color-vision') as HTMLSelectElement | null;
+    cvSelect?.addEventListener('change', () => {
+      const mode = cvSelect.value as ColorVisionPaletteMode;
+      this.workflowState.colorVisionMode = mode;
+      this.renderer.setColorVisionPalette(mode);
+      this.renderer.syncWithSimulation(this.world);
+    });
+
+    document.querySelectorAll<HTMLButtonElement>('.mag-preset-btn').forEach((btn) => {
+      btn.addEventListener('click', () => {
+        const preset = btn.dataset.mag as MagneticScenarioPreset;
+        this.world.setMagneticScenarioPreset(preset);
+        this.renderer.syncWithSimulation(this.world);
+        this.updateUIReadouts();
+      });
+    });
+
+    document.getElementById('btn-spawn-asteroid')?.addEventListener('click', () => {
+      this.world.spawnAsteroidThreat();
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-deflect-asteroid')?.addEventListener('click', () => {
+      const threat = this.world.spaceWeather.upcomingQueue.find((q) => !q.resolved);
+      if (threat) {
+        this.world.mitigateAsteroidThreat(threat.id, 'KINETIC_IMPACTOR');
+        this.updateUIReadouts();
+      }
+    });
+
+    document.getElementById('btn-space-flare')?.addEventListener('click', () => {
+      this.world.triggerSpaceEvent('STELLAR_FLARE', 1.2);
+      this.syncSlidersFromParams();
+      this.renderer.syncWithSimulation(this.world);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-space-cme')?.addEventListener('click', () => {
+      this.world.triggerSpaceEvent('CME_RADIATION_STORM', 1.5);
+      this.syncSlidersFromParams();
+      this.renderer.syncWithSimulation(this.world);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-extract-iron')?.addEventListener('click', () => {
+      this.world.extractPlanetaryResource('IRON_ORE', 250, 0.35);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-extract-carbon')?.addEventListener('click', () => {
+      this.world.extractPlanetaryResource('HYDROCARBON_CARBON', 180, 0.05);
+      this.syncSlidersFromParams();
+      this.renderer.syncWithSimulation(this.world);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-run-observation')?.addEventListener('click', () => {
+      const sel = document.getElementById('select-obs-mode') as HTMLSelectElement | null;
+      const mode = (sel?.value ?? 'VISIBLE') as ObservingMode;
+      this.world.performRemoteSensingObservation(mode);
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-record-strata')?.addEventListener('click', () => {
+      this.world.recordStratigraphySnapshot('Manual Core Sample');
+      this.updateUIReadouts();
+    });
+
+    document.getElementById('btn-run-correlation')?.addEventListener('click', () => {
+      const corr = computeMetricCorrelation(this.world.telemetryHistory, 'co2Ppm', 'meanTempC');
+      const chains = buildCausalAttributionChains(this.world.telemetryHistory, this.world.eventLog);
+      const out = document.getElementById('analytics-readout');
+      if (out) {
+        out.innerHTML = `
+          <div class="honesty-row"><span>r(CO₂, Temp):</span><strong>${corr.pearsonR.toFixed(3)} (${corr.strengthLabel})</strong></div>
+          <div class="honesty-row"><span>Causal Chains:</span><strong>${chains.length} tracked</strong></div>
+          <div class="honesty-note">${corr.causalDisclaimer}</div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-run-montecarlo')?.addEventListener('click', () => {
+      const mc = runMonteCarloEnsemble(this.world.params.seed, this.world.params.preset, 3, 4);
+      const last = mc.bands[mc.bands.length - 1];
+      const out = document.getElementById('analytics-readout');
+      if (out && last) {
+        out.innerHTML = `
+          <div class="honesty-row"><span>Ensemble Runs:</span><strong>${mc.runs}x (${mc.stepsPerRun} steps)</strong></div>
+          <div class="honesty-row"><span>Biosphere Survival:</span><strong>${(mc.survivalProbability * 100).toFixed(0)}%</strong></div>
+          <div class="honesty-row"><span>P10..P90 Temp:</span><strong>${last.p10TempC}°C .. ${last.p90TempC}°C</strong></div>
+        `;
+      }
+    });
+
+    document.getElementById('btn-export-csv')?.addEventListener('click', () => {
+      const csv = exportWorldAnalyticsCsv(this.world.telemetryHistory);
+      const blob = new Blob([csv], { type: 'text/csv' });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = `hxn-telemetry-${this.world.params.seed}.csv`;
+      a.click();
+      URL.revokeObjectURL(url);
+    });
+  }
+
+  private renderFrontierAndSciencePanels(): void {
+    const sitesEl = document.getElementById('exploration-sites-list');
+    if (sitesEl) {
+      sitesEl.innerHTML = '';
+      for (const site of this.world.exploration.landingCandidates.slice(0, 4)) {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = `<div><strong>${site.name}</strong><div class="list-item-meta">Safety: ${(site.safetyScore * 100).toFixed(0)}% | Sci: ${(site.scienceScore * 100).toFixed(0)}%</div></div>`;
+        const btn = document.createElement('button');
+        btn.className = 'btn btn-accent';
+        btn.textContent = 'Land';
+        btn.addEventListener('click', () => {
+          this.selectedLat = site.latDeg;
+          this.selectedLon = site.lonDeg;
+          this.renderer.setSelectionMarker(site.latDeg, site.lonDeg);
+          this.renderer.focusOnLatLon(site.latDeg, site.lonDeg);
+          this.world.scanSurfaceAt(site.latDeg, site.lonDeg);
+          this.renderer.syncWithSimulation(this.world);
+          this.updateUIReadouts();
+        });
+        div.appendChild(btn);
+        sitesEl.appendChild(div);
+      }
+    }
+
+    const discEl = document.getElementById('exploration-discoveries-list');
+    if (discEl) {
+      discEl.innerHTML = '';
+      for (const d of this.world.exploration.discoveries.slice(0, 5)) {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = `<div><strong>[${d.epistemicClass === 'SYNTHETIC_OBSERVATION' ? 'OBS' : 'GEN'}] ${d.title}</strong><div class="list-item-meta">${d.evidenceData}</div></div>`;
+        discEl.appendChild(div);
+      }
+    }
+
+    const civEl = document.getElementById('civilization-list');
+    if (civEl) {
+      civEl.innerHTML = '';
+      if (this.world.civilization.civilizations.length === 0) {
+        civEl.innerHTML = `<div class="micro-note">No active civilizations yet. Click "Found Civilization Here" or evolve intelligent fauna.</div>`;
+      } else {
+        for (const c of this.world.civilization.civilizations) {
+          const div = document.createElement('div');
+          div.className = 'list-item';
+          div.innerHTML = `<div><strong>${c.name} (${c.active ? 'ACTIVE' : 'COLLAPSED'})</strong><div class="list-item-meta">Pop: ${c.populationMillions}M | Tech: ${(c.techIndex * 100).toFixed(0)}% | Renewables: ${(c.renewableShare * 100).toFixed(0)}% | ${c.unlockedMilestones.join(', ') || 'Early'}</div></div>`;
+          civEl.appendChild(div);
+        }
+      }
+    }
+
+    const tfEl = document.getElementById('terraforming-projects-list');
+    if (tfEl) {
+      tfEl.innerHTML = '';
+      for (const p of this.world.terraforming.projects.slice(0, 4)) {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = `<div><strong>${p.title}</strong><div class="list-item-meta">${p.status} (${(p.progress * 100).toFixed(0)}%) | ±${p.uncertaintyPct}% unc.</div></div>`;
+        tfEl.appendChild(div);
+      }
+    }
+
+    const mmEl = document.getElementById('missions-mods-list');
+    if (mmEl) {
+      mmEl.innerHTML = '';
+      for (const m of this.world.missions.activeMissions.slice(0, 3)) {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        const doneCount = m.objectives.filter((o) => o.completed).length;
+        div.innerHTML = `<div><strong>🎯 ${m.title} [${m.status}]</strong><div class="list-item-meta">Objectives: ${doneCount}/${m.objectives.length} | Score: ${this.world.missions.totalScore}</div></div>`;
+        mmEl.appendChild(div);
+      }
+      for (const ext of this.world.modding.extensions.slice(0, 2)) {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = `<div><strong>🧩 ${ext.manifest.name} v${ext.manifest.version}</strong><div class="list-item-meta">API ${ext.manifest.targetApiVersion} — ${ext.status}</div></div>`;
+        mmEl.appendChild(div);
+      }
+    }
+
+    const magEl = document.getElementById('magnetosphere-readout');
+    if (magEl) {
+      const m = this.world.magnetosphere;
+      magEl.innerHTML = `
+        <div class="honesty-row"><span>Dipole / Stand-off:</span><strong>${m.dipoleMomentEarths.toFixed(2)} M⊕ | ${m.magnetopauseRadiusRe.toFixed(1)} R_p</strong></div>
+        <div class="honesty-row"><span>Surface Radiation:</span><strong>${m.meanSurfaceRadiationSvYr.toFixed(4)} Sv/yr (Esc: ${(m.atmosphericEscapeRiskIndex * 100).toFixed(0)}%)</strong></div>
+      `;
+    }
+
+    const swEl = document.getElementById('space-weather-list');
+    if (swEl) {
+      swEl.innerHTML = '';
+      for (const q of this.world.spaceWeather.upcomingQueue.slice(0, 3)) {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = `<div><strong>${q.name} (${q.diameterMeters}m)</strong><div class="list-item-meta">Risk: ${(q.impactProbability * 100).toFixed(0)}% | ${q.estimatedEnergyMegatonsTnt.toFixed(0)} MT | ${q.outcomeNote}</div></div>`;
+        swEl.appendChild(div);
+      }
+    }
+
+    const geoEl = document.getElementById('geochemistry-readout');
+    if (geoEl) {
+      const g = this.world.geochemistry;
+      geoEl.innerHTML = `
+        <div class="honesty-row"><span>Reservoir C (Atmo/Ocean):</span><strong>${g.reservoirs.C.atmosphere.toFixed(0)} / ${g.reservoirs.C.ocean.toFixed(0)} Gt</strong></div>
+        <div class="honesty-row"><span>Weathering / Outgas:</span><strong>${g.weatheringRateGtYr.toFixed(2)} / ${g.volcanicOutgassingGtYr.toFixed(2)} Gt/yr</strong></div>
+        <div class="honesty-row"><span>Mass Balance Drift:</span><strong>${g.massBalanceMaxDriftPercent.toFixed(4)}%</strong></div>
+      `;
+    }
+
+    const rsEl = document.getElementById('remote-sensing-readout');
+    if (rsEl) {
+      const inf = this.world.remoteSensing.lastInference;
+      if (!inf) {
+        rsEl.innerHTML = `<div class="honesty-note">Click "Observe" to generate synthetic spectrum, transit light curve & parameter inference.</div>`;
+      } else {
+        rsEl.innerHTML = `
+          <div class="honesty-row"><span>Inferred vs True R:</span><strong>${inf.inferredRadiusKm}±${inf.radiusUncertaintyKm} vs ${inf.actualRadiusKm} km</strong></div>
+          <div class="honesty-row"><span>Inferred vs True T:</span><strong>${inf.inferredTempK}±${inf.tempUncertaintyK} vs ${inf.actualTempK.toFixed(1)} K</strong></div>
+          <div class="honesty-row"><span>Spectral Features:</span><strong>${inf.detectedGases.join(', ') || 'Continuum'} (Bio: ${(inf.biosignatureConfidence * 100).toFixed(0)}%)</strong></div>
+        `;
+      }
+    }
+
+    const stEl = document.getElementById('stratigraphy-list');
+    if (stEl) {
+      stEl.innerHTML = '';
+      for (const l of this.world.naturalHistory.layers.slice(0, 4)) {
+        const div = document.createElement('div');
+        div.className = 'list-item';
+        div.innerHTML = `<div><strong>${l.lithology} (-${l.depthMetersFromTop}m)</strong><div class="list-item-meta">${l.ageYearsLabel} | T=${l.meanTempCAtDeposition.toFixed(1)}°C | Fossils: ${l.preservedFossilIds.length}</div></div>`;
+        stEl.appendChild(div);
+      }
+    }
   }
 
   private loop(now: number): void {

@@ -805,4 +805,29 @@ body[data-ui-mode="CREATOR"] .advanced-only {
   color: #cbd5e1;
 }
 
+body.high-contrast {
+  --bg-panel: rgba(0, 0, 0, 0.96);
+  --border-subtle: rgba(255, 255, 255, 0.75);
+  --border-accent: #facc15;
+  --text-main: #ffffff;
+  --text-muted: #e2e8f0;
+  --accent-cyan: #facc15;
+}
 
+.cmd-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 7px 10px;
+  border-radius: 6px;
+  background: rgba(15, 23, 42, 0.85);
+  border: 1px solid rgba(148, 163, 184, 0.22);
+  cursor: pointer;
+  font-size: 12px;
+  color: var(--text-main);
+}
+
+.cmd-item:hover {
+  border-color: var(--accent-cyan);
+  background: rgba(56, 189, 248, 0.16);
+}

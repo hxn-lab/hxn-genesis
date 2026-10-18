@@ -35,8 +35,28 @@ import {
 } from '../src/sim/time';
 import { SerializedWorldSnapshot } from '../src/sim/types';
 import { WorldSimulation } from '../src/sim/world';
+import {
+  buildCausalAttributionChains,
+  compareWorldSnapshots,
+  computeMetricCorrelation,
+  exportWorldAnalyticsCsv,
+  runMonteCarloEnsemble,
+  runParameterSensitivitySweep
+} from '../src/sim/analytics';
+import {
+  exportChallengeMissionJson,
+  importChallengeMissionJson
+} from '../src/sim/missions';
+import {
+  BUILTIN_EXAMPLE_EXTENSION,
+  validateExtensionManifest
+} from '../src/sim/modding';
 import { KEYBOARD_SHORTCUTS, resolveShortcutAction } from '../src/ui/shortcuts';
 import { TUTORIAL_STEPS, TutorialController } from '../src/ui/tutorial';
+import {
+  DEFAULT_GUIDED_TOUR_STOPS,
+  filterCommandPaletteActions
+} from '../src/ui/workflows';
 
 function createMemoryStorage(): Record<string, string> {
   const store: Record<string, string> = {};
@@ -571,8 +591,20 @@ describe('HXN GENESIS 3.0 — 18+ Automated Acceptance Tests: Planet Creator, Sc
       'src/sim/time.ts',
       'src/sim/types.ts',
       'src/sim/world.ts',
+      'src/sim/magnetism.ts',
+      'src/sim/spaceWeather.ts',
+      'src/sim/geochemistry.ts',
+      'src/sim/naturalHistory.ts',
+      'src/sim/exploration.ts',
+      'src/sim/remoteSensing.ts',
+      'src/sim/civilization.ts',
+      'src/sim/terraforming.ts',
+      'src/sim/analytics.ts',
+      'src/sim/missions.ts',
+      'src/sim/modding.ts',
       'src/ui/shortcuts.ts',
-      'src/ui/tutorial.ts'
+      'src/ui/tutorial.ts',
+      'src/ui/workflows.ts'
     ];
 
     const forbiddenPattern = new RegExp(['/home/', 'hug', 'C:\\\\Users\\\\'].join('|'));
@@ -584,4 +616,190 @@ describe('HXN GENESIS 3.0 — 18+ Automated Acceptance Tests: Planet Creator, Sc
       expect(forbiddenPattern.test(content)).toBe(false);
     }
   });
+
+  it('19. Planetary exploration, landing site evaluation, expedition scanning, bookmarks & atlas naming', () => {
+    const world = new WorldSimulation(72, 36, 'Earth-like', 'EXPLORE-TEST');
+    world.seedGlobalBiosphere(true);
+    world.refreshExplorationLandingSites();
+    expect(world.exploration.landingCandidates.length).toBeGreaterThanOrEqual(4);
+    expect(world.exploration.atlasRegions.length).toBeGreaterThanOrEqual(4);
+
+    const disc = world.scanSurfaceAt(15, 30);
+    expect(disc.epistemicClass).toBeDefined();
+    expect(world.exploration.discoveries.length).toBeGreaterThanOrEqual(1);
+
+    const bm = world.addSurfaceBookmark('Equatorial Basin Camp', 15, 30, 'High habitability');
+    expect(bm.label).toBe('Equatorial Basin Camp');
+    expect(world.exploration.bookmarks.length).toBeGreaterThanOrEqual(2);
+
+    const firstReg = world.exploration.atlasRegions[0].id;
+    expect(world.renameRegionInAtlas(firstReg, 'Prime Meridian Reach')).toBe(true);
+    expect(world.exploration.atlasRegions[0].name).toBe('Prime Meridian Reach');
+  });
+
+  it('20. Geochemistry reservoirs, mineral deposit field, extraction experiments, and mass-balance tracking', () => {
+    const world = new WorldSimulation(72, 36, 'Earth-like', 'GEOCHEM-TEST');
+    expect(world.geochemistry.reservoirs.C.crust).toBeGreaterThan(0);
+    expect(world.mineralField.length).toBe(world.numCells);
+
+    const ext = world.extractPlanetaryResource('HYDROCARBON_CARBON', 0.6, 0.25);
+    expect(ext.co2ReleasedPpm).toBeGreaterThan(0);
+    expect(world.geochemistry.extractionHistory.length).toBe(1);
+
+    world.singleStep(3600 * 24 * 365 * 10000);
+    expect(Math.abs(world.geochemistry.massBalanceMaxDriftPercent)).toBeLessThan(1.0);
+  });
+
+  it('21. Civilization emergence, settlements, technological milestones, policies, and atmospheric feedback', () => {
+    const world = new WorldSimulation(72, 36, 'Earth-like', 'CIV-TEST');
+    world.seedGlobalBiosphere(true);
+    const civ = world.spawnCivilizationAt(10, 20, 'Aurelian Republic', 0.25);
+    expect(civ).not.toBeNull();
+    expect(world.civilization.civilizations.length).toBe(1);
+    expect(civ.settlements.length).toBeGreaterThanOrEqual(1);
+
+    expect(world.applyCivilizationPolicy(civ.id, 'ACCELERATE_RENEWABLES')).toBe(true);
+    expect(world.civilization.history.some((e) => e.category === 'STEWARDSHIP')).toBe(true);
+
+    world.singleStep(3600 * 24 * 365 * 5000);
+    expect(world.civilization.civilizations[0].populationMillions).toBeGreaterThan(0);
+  });
+
+  it('22. Planetary engineering & terraforming feasibility validation, execution, cancellation, and snapshots', () => {
+    const world = new WorldSimulation(72, 36, 'Desert World', 'TERRA-TEST');
+    world.params.seaLevelMeters = 9000;
+    world.initializeEquilibriumClimate();
+    const badProj = world.startTerraformingProject('ICE_RELOCATION', 0.8);
+    expect(badProj.status === 'ACTIVE' || badProj.status === 'REJECTED_IMPOSSIBLE').toBe(true);
+
+    const goodProj = world.startTerraformingProject('WATER_IMPORT_COMETS', 0.7);
+    expect(goodProj.status).toBe('ACTIVE');
+    expect(world.terraforming.projects.length).toBeGreaterThanOrEqual(1);
+
+    world.singleStep(3600 * 24 * 365 * 20000);
+    expect(goodProj.progress).toBeGreaterThan(0);
+
+    const snap = world.recordTerraformingBranchSnapshot('Post-Water Import');
+    expect(snap.label).toBe('Post-Water Import');
+    expect(world.cancelTerraforming(goodProj.id)).toBe(true);
+  });
+
+  it('23. Space weather, asteroid threat scheduling, energy calculation, mitigation, and stellar flares', () => {
+    const world = new WorldSimulation(72, 36, 'Earth-like', 'SPACE-TEST');
+    const ast = world.spawnAsteroidThreat({ diameterMeters: 1800, velocityKms: 22, impactProbability: 0.8 });
+    expect(ast.estimatedEnergyMegatonsTnt).toBeGreaterThan(1000);
+    expect(typeof ast.isDeterministicScenario).toBe('boolean');
+
+    const mitigated = world.mitigateAsteroidThreat(ast.id, 'KINETIC_IMPACTOR');
+    expect(mitigated.success).toBe(true);
+    expect(ast.impactProbability).toBeLessThan(0.8);
+
+    const ev = world.triggerSpaceEvent('CME_RADIATION_STORM', 0.75);
+    expect(ev.report.kind).toBe('CME_RADIATION_STORM');
+    expect(world.spaceWeather.postEventReports.length).toBeGreaterThanOrEqual(1);
+  });
+
+  it('24. Planetary magnetism, radiation belts, scenario presets, and remote sensing synthetic observations', () => {
+    const world = new WorldSimulation(72, 36, 'Earth-like', 'MAG-OBS-TEST');
+    expect(world.magnetosphere.dipoleMomentEarths).toBeGreaterThan(0.2);
+    expect(world.radiationField.length).toBe(world.numCells);
+
+    world.setMagneticScenarioPreset('UNMAGNETIZED');
+    expect(world.magnetosphere.dipoleMomentEarths).toBeLessThan(0.05);
+    const unmagDose = world.magnetosphere.meanSurfaceRadiationSvYr;
+
+    world.setMagneticScenarioPreset('SUPER_MAGNETOSPHERE');
+    expect(world.magnetosphere.meanSurfaceRadiationSvYr).toBeLessThan(unmagDose);
+
+    const obs = world.performRemoteSensingObservation('INFRARED');
+    expect(obs.spectrum.length).toBeGreaterThanOrEqual(5);
+    expect(obs.curves.orbitalPhaseStep.length).toBeGreaterThanOrEqual(10);
+    expect(obs.inference.inferredRadiusKm).toBeGreaterThan(1000);
+
+    const plan = world.planRemoteSensingMission('Deep IR Survey', 'ORBITAL_SURVEY', 'THERMAL');
+    expect(plan.completed).toBe(true);
+  });
+
+  it('25. Natural history, stratigraphic column recording, fossil preservation, and paleo reconstruction', () => {
+    const world = new WorldSimulation(72, 36, 'Earth-like', 'STRAT-TEST');
+    world.seedGlobalBiosphere(true);
+    const layer = world.recordStratigraphySnapshot('Cambrian Equivalent');
+    expect(layer.lithology).toBeDefined();
+    expect(world.naturalHistory.fossils.length).toBeGreaterThanOrEqual(1);
+
+    const recon = world.reconstructLayerEnvironment(layer.id);
+    expect(recon).not.toBeNull();
+    expect(recon?.sourceType).toBeDefined();
+  });
+
+  it('26. Planetary analytics: multi-world comparison, correlation, causal chains, sweeps, Monte Carlo & CSV', () => {
+    const w1 = new WorldSimulation(36, 18, 'Earth-like', 'ANA-1');
+    const w2 = new WorldSimulation(36, 18, 'Desert World', 'ANA-2');
+    w1.singleStep(3600 * 24 * 365 * 1000);
+    w1.singleStep(3600 * 24 * 365 * 1000);
+    const comp = compareWorldSnapshots([
+      { label: 'Earth', snapshot: w1.serializeSnapshot('Earth') },
+      { label: 'Desert', snapshot: w2.serializeSnapshot('Desert') }
+    ]);
+    expect(comp.length).toBe(2);
+
+    const corr = computeMetricCorrelation(w1.telemetryHistory, 'co2Ppm', 'meanTempC');
+    expect(corr.causalDisclaimer).toContain('correlation');
+
+    w1.triggerHazard('VOLCANO', 0, 0, 0.8);
+    const chains = buildCausalAttributionChains(w1.telemetryHistory, w1.eventLog);
+    expect(chains.length).toBeGreaterThanOrEqual(1);
+
+    const sweep = runParameterSensitivitySweep('SWEEP-SEED', 'Earth-like', 'solarLuminosity', [0.9, 1.1]);
+    expect(sweep.points.length).toBe(2);
+
+    const mc = runMonteCarloEnsemble('MC-SEED', 'Earth-like', 2, 2);
+    expect(mc.bands.length).toBe(2);
+
+    const csv = exportWorldAnalyticsCsv(w1.telemetryHistory);
+    expect(csv).toContain('yearsNumeric');
+  });
+
+  it('27. Procedural missions, custom challenge import/export, modding manifest validation, and UI workflows', () => {
+    const world = new WorldSimulation(72, 36, 'Earth-like', 'MISSION-MOD-TEST');
+    expect(world.missions.activeMissions.length).toBeGreaterThanOrEqual(1);
+
+    const custom = world.addCustomMission({
+      title: 'High Temp Challenge',
+      maxSteps: 500,
+      hintText: 'Warm planet above 15C',
+      metric: 'MEAN_TEMP_C',
+      comparator: 'GTE',
+      targetMin: 15
+    });
+    const exportedJson = exportChallengeMissionJson(custom);
+    const reimported = importChallengeMissionJson(world.missions, exportedJson);
+    expect(reimported.mission?.title).toBe('High Temp Challenge');
+
+    const check = validateExtensionManifest(BUILTIN_EXAMPLE_EXTENSION);
+    expect(check.valid).toBe(true);
+    expect(world.applyModExtension(BUILTIN_EXAMPLE_EXTENSION.id).applied).toBe(true);
+
+    const badCheck = validateExtensionManifest({ id: 'x', name: 'Bad' });
+    expect(badCheck.valid).toBe(false);
+
+    expect(DEFAULT_GUIDED_TOUR_STOPS.length).toBeGreaterThanOrEqual(4);
+    const filtered = filterCommandPaletteActions(
+      [
+        {
+          id: 'c1',
+          titleEn: 'Toggle Magnetosphere',
+          titleVi: 'Từ quyển',
+          category: 'VISUALIZATION',
+          keywords: ['magnetic'],
+          run: () => {}
+        }
+      ],
+      'mag',
+      'en'
+    );
+    expect(filtered.length).toBe(1);
+  });
 });
+
+

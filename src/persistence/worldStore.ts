@@ -11,9 +11,19 @@ import { createDefaultGeologyParameters, validateGeologyParameters } from '../si
 import { createDefaultPlanetProperties, validatePlanetProperties } from '../sim/planetPhysics';
 import { createDefaultTerrainSettings, validateTerrainSettings } from '../sim/terrainGen';
 import { SerializedWorldSnapshot } from '../sim/types';
+import { createDefaultMagnetosphereState } from '../sim/magnetism';
+import { createDefaultSpaceWeatherState } from '../sim/spaceWeather';
+import { createDefaultGeochemistryState } from '../sim/geochemistry';
+import { createDefaultNaturalHistoryState } from '../sim/naturalHistory';
+import { createDefaultExplorationState } from '../sim/exploration';
+import { createDefaultRemoteSensingState } from '../sim/remoteSensing';
+import { createDefaultCivilizationState } from '../sim/civilization';
+import { createDefaultTerraformingState } from '../sim/terraforming';
+import { createDefaultMissionSystemState } from '../sim/missions';
+import { createDefaultModdingState } from '../sim/modding';
 
 export const CURRENT_SNAPSHOT_VERSION = 4;
-export const MAX_IMPORT_JSON_BYTES = 18 * 1024 * 1024; // 18 MB safety ceiling
+export const MAX_IMPORT_JSON_BYTES = 18 * 1024 * 1024;
 export const STORAGE_KEY_WORLD_LIBRARY = 'hxn_genesis_worlds_v4';
 export const STORAGE_KEY_AUTOSAVE = 'hxn_genesis_autosave_v4';
 
@@ -25,11 +35,6 @@ export interface SavedWorldEntry {
   snapshot: SerializedWorldSnapshot;
 }
 
-/**
- * Migrates any v1, v2, v3, or v4 snapshot to v4, preserving all existing fields
- * and populating safe defaults for newly added 3.0 properties (`planet`, `terrain`,
- * `geology`, `pressureBar`, `argonPercent`).
- */
 export function migrateSnapshotToV4(raw: unknown): SerializedWorldSnapshot {
   if (!raw || typeof raw !== 'object') {
     throw new Error('Invalid or corrupted snapshot structure: expected a JSON object.');
@@ -90,7 +95,17 @@ export function migrateSnapshotToV4(raw: unknown): SerializedWorldSnapshot {
     speciesLineages: Array.isArray(snap.speciesLineages) ? snap.speciesLineages : [],
     telemetryHistory: Array.isArray(snap.telemetryHistory) ? snap.telemetryHistory : [],
     activeHazards: Array.isArray(snap.activeHazards) ? snap.activeHazards : [],
-    eventLog: Array.isArray(snap.eventLog) ? snap.eventLog : []
+    eventLog: Array.isArray(snap.eventLog) ? snap.eventLog : [],
+    magnetosphere: snap.magnetosphere ?? createDefaultMagnetosphereState(),
+    spaceWeather: snap.spaceWeather ?? createDefaultSpaceWeatherState(),
+    geochemistry: snap.geochemistry ?? createDefaultGeochemistryState(),
+    naturalHistory: snap.naturalHistory ?? createDefaultNaturalHistoryState(),
+    exploration: snap.exploration ?? createDefaultExplorationState(),
+    remoteSensing: snap.remoteSensing ?? createDefaultRemoteSensingState(),
+    civilization: snap.civilization ?? createDefaultCivilizationState(),
+    terraforming: snap.terraforming ?? createDefaultTerraformingState(),
+    missions: snap.missions ?? createDefaultMissionSystemState(migratedParams.seed),
+    modding: snap.modding ?? createDefaultModdingState()
   };
 }
 

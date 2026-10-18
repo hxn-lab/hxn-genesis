@@ -250,6 +250,17 @@ export interface CellInspection {
   biome: BiomeClassification;
 }
 
+import { MagnetosphereState } from './magnetism';
+import { SpaceWeatherState } from './spaceWeather';
+import { GeochemistryState } from './geochemistry';
+import { NaturalHistoryState } from './naturalHistory';
+import { ExplorationState } from './exploration';
+import { RemoteSensingState } from './remoteSensing';
+import { CivilizationState } from './civilization';
+import { TerraformingState } from './terraforming';
+import { MissionSystemState } from './missions';
+import { ModdingSystemState } from './modding';
+
 export interface SerializedWorldSnapshot {
   version: number;
   label: string;
@@ -277,4 +288,15 @@ export interface SerializedWorldSnapshot {
   telemetryHistory?: TelemetryHistoryPoint[];
   activeHazards: ActiveHazardEvent[];
   eventLog: SimEventLogEntry[];
+  magnetosphere?: MagnetosphereState;
+  spaceWeather?: SpaceWeatherState;
+  geochemistry?: GeochemistryState;
+  naturalHistory?: NaturalHistoryState;
+  exploration?: ExplorationState;
+  remoteSensing?: RemoteSensingState;
+  civilization?: CivilizationState;
+  terraforming?: TerraformingState;
+  missions?: MissionSystemState;
+  modding?: ModdingSystemState;
 }
+

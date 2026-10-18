@@ -16,7 +16,10 @@ export type OverlayLayerMode =
   | 'ELEVATION'
   | 'PRECIPITATION'
   | 'ICE'
-  | 'WIND';
+  | 'WIND'
+  | 'RADIATION'
+  | 'MINERALS'
+  | 'CIVILIZATION';
 
 export type CameraPresetMode = 'DEFAULT' | 'NORTH_POLE' | 'SOUTH_POLE' | 'EQUATOR';
 
@@ -35,9 +38,13 @@ export class PlanetRenderer {
   public overlayMode: OverlayLayerMode = 'TRUE_COLOR';
   public visualQuality: VisualQualityPreset = 'High';
   public graticuleVisible = false;
+  public magnetosphereVisible = false;
+  public colorVisionMode: 'STANDARD' | 'DEUTERANOPIA_SAFE' | 'PROTANOPIA_SAFE' | 'TRITANOPIA_SAFE' = 'STANDARD';
 
   private planetRootGroup: THREE.Group;
   private graticuleGroup: THREE.Group;
+  private magnetosphereGroup: THREE.Group;
+  private expeditionGroup: THREE.Group;
   private axisIndicator: THREE.Line;
 
   private terrainMesh: THREE.Mesh;
@@ -268,18 +275,87 @@ export class PlanetRenderer {
     this.faunaPoints = new THREE.Points(this.faunaGeo, faunaMat);
     this.planetRootGroup.add(this.faunaPoints);
 
-    // 8. 3D Latitude/Longitude Graticule + Axial Tilt Indicator
     const { group, axisLine } = this.createGraticuleAndAxis();
     this.graticuleGroup = group;
     this.axisIndicator = axisLine;
     this.graticuleGroup.visible = this.graticuleVisible;
     this.planetRootGroup.add(this.graticuleGroup);
 
+    this.magnetosphereGroup = this.createMagnetosphereLines();
+    this.magnetosphereGroup.visible = this.magnetosphereVisible;
+    this.planetRootGroup.add(this.magnetosphereGroup);
+
+    this.expeditionGroup = new THREE.Group();
+    this.planetRootGroup.add(this.expeditionGroup);
+
     this.controls.addEventListener('start', () => {
       this.cameraTargetPos = null;
     });
 
     this.syncWithSimulation(world);
+  }
+
+  private createMagnetosphereLines(): THREE.Group {
+    const group = new THREE.Group();
+    const fieldMat = new THREE.LineBasicMaterial({ color: 0x38bdf8, transparent: true, opacity: 0.55 });
+    const windMat = new THREE.LineBasicMaterial({ color: 0xf59e0b, transparent: true, opacity: 0.4 });
+    const lShells = [1.45, 1.95, 2.55];
+    const meridians = [0, 45, 90, 135, 180, 225, 270, 315];
+
+    for (const L of lShells) {
+      for (const lonDeg of meridians) {
+        const lon = (lonDeg * Math.PI) / 180;
+        const pts: THREE.Vector3[] = [];
+        for (let s = -36; s <= 36; s++) {
+          const lam = (s / 36) * 1.15;
+          const cosLam = Math.cos(lam);
+          const r = this.planetRadius * L * cosLam * cosLam;
+          if (r < this.planetRadius * 0.98) continue;
+          const x = r * cosLam * Math.cos(lon);
+          const y = r * Math.sin(lam);
+          const z = r * cosLam * Math.sin(lon);
+          pts.push(new THREE.Vector3(x, y, z));
+        }
+        if (pts.length > 2) {
+          const geo = new THREE.BufferGeometry().setFromPoints(pts);
+          group.add(new THREE.Line(geo, fieldMat));
+        }
+      }
+    }
+
+    for (let w = -2; w <= 2; w++) {
+      const yOff = w * 3.8;
+      const pts = [
+        new THREE.Vector3(this.planetRadius * 3.2, yOff, -6),
+        new THREE.Vector3(this.planetRadius * 2.2, yOff * 1.15, 0),
+        new THREE.Vector3(this.planetRadius * 3.2, yOff, 6)
+      ];
+      const geo = new THREE.BufferGeometry().setFromPoints(pts);
+      group.add(new THREE.Line(geo, windMat));
+    }
+
+    return group;
+  }
+
+  public setMagnetosphereVisible(visible: boolean): void {
+    this.magnetosphereVisible = visible;
+    this.magnetosphereGroup.visible = visible;
+  }
+
+  public toggleMagnetosphere(): boolean {
+    this.setMagnetosphereVisible(!this.magnetosphereVisible);
+    return this.magnetosphereVisible;
+  }
+
+  public setCameraSpeedMultiplier(mult: number): void {
+    const safe = Math.max(0.2, Math.min(3.5, mult));
+    this.controls.rotateSpeed = 0.65 * safe;
+    this.controls.zoomSpeed = 1.0 * safe;
+    this.controls.panSpeed = 0.8 * safe;
+  }
+
+  public setColorVisionPalette(mode: 'STANDARD' | 'DEUTERANOPIA_SAFE' | 'PROTANOPIA_SAFE' | 'TRITANOPIA_SAFE'): void {
+    this.colorVisionMode = mode;
   }
 
   private createGraticuleAndAxis(): { group: THREE.Group; axisLine: THREE.Line } {
@@ -549,6 +625,42 @@ export class PlanetRenderer {
         r = 0.15 + 0.85 * wNorm;
         g = 0.2 + 0.55 * (1 - Math.abs(wNorm - 0.5) * 2);
         b = 0.85 - 0.6 * wNorm;
+      } else if (this.overlayMode === 'RADIATION') {
+        const rad = world.sampleFieldBilinear(world.radiationField, lat, lon);
+        r = 0.12 + 0.88 * rad;
+        g = 0.14 + 0.5 * (1 - rad);
+        b = 0.35 + 0.6 * rad;
+      } else if (this.overlayMode === 'MINERALS') {
+        const minVal = world.sampleFieldBilinear(world.mineralField, lat, lon);
+        r = 0.16 + 0.78 * minVal;
+        g = 0.18 + 0.64 * Math.pow(minVal, 0.8);
+        b = 0.22 + 0.25 * (1 - minVal);
+      } else if (this.overlayMode === 'CIVILIZATION') {
+        r = 0.08 + hab * 0.18;
+        g = 0.12 + hab * 0.28;
+        b = 0.22 + hab * 0.32;
+        if (world.civilization.civilizations.length > 0) {
+          const cellIdx = world.latLonToCellIndex((lat * 180) / Math.PI, (lon * 180) / Math.PI);
+          for (const civ of world.civilization.civilizations) {
+            if (civ.active && civ.territoryCells.includes(cellIdx)) {
+              r = 0.96;
+              g = 0.78;
+              b = 0.18;
+              break;
+            }
+          }
+        }
+      }
+
+      if (this.colorVisionMode === 'DEUTERANOPIA_SAFE' || this.colorVisionMode === 'PROTANOPIA_SAFE') {
+        const rg = 0.5 * (r + g);
+        r = rg * 1.05;
+        g = rg * 0.92;
+        b = Math.min(1, b * 1.15 + 0.05);
+      } else if (this.colorVisionMode === 'TRITANOPIA_SAFE') {
+        const gb = 0.5 * (g + b);
+        g = gb;
+        b = gb;
       }
 
       colArr[i * 3] = r;
@@ -644,9 +756,58 @@ export class PlanetRenderer {
       this.cloudTexture.needsUpdate = true;
     }
 
-    // 5. Sync 3D Hazard Markers & Fauna Ecosystem Points
     this.syncHazardMarkers(world);
     this.syncFaunaPoints(world, seaLevel);
+    this.syncExpeditionAndSettlementMarkers(world);
+    if (this.magnetosphereGroup.visible) {
+      const magScale = Math.max(0.4, Math.min(2.2, Math.cbrt(Math.max(0.05, world.magnetosphere.dipoleMomentEarths))));
+      this.magnetosphereGroup.scale.setScalar(magScale);
+    }
+  }
+
+  private syncExpeditionAndSettlementMarkers(world: WorldSimulation): void {
+    while (this.expeditionGroup.children.length > 0) {
+      const child = this.expeditionGroup.children[0] as THREE.Mesh;
+      child.geometry?.dispose();
+      this.expeditionGroup.remove(child);
+    }
+
+    if (world.exploration.expeditionActive) {
+      const lat = (world.exploration.roverLatDeg * Math.PI) / 180;
+      const lon = (world.exploration.roverLonDeg * Math.PI) / 180;
+      const r = this.planetRadius * 1.038;
+      const pos = new THREE.Vector3(
+        Math.cos(lat) * Math.cos(lon) * r,
+        Math.sin(lat) * r,
+        Math.cos(lat) * Math.sin(lon) * r
+      );
+      const geo = new THREE.RingGeometry(0.14, 0.24, 24);
+      const mat = new THREE.MeshBasicMaterial({ color: 0x10b981, side: THREE.DoubleSide, depthTest: false });
+      const mesh = new THREE.Mesh(geo, mat);
+      mesh.position.copy(pos);
+      mesh.lookAt(pos.clone().multiplyScalar(2));
+      this.expeditionGroup.add(mesh);
+    }
+
+    for (const civ of world.civilization.civilizations) {
+      if (!civ.active) continue;
+      for (const s of civ.settlements) {
+        const lat = (s.latDeg * Math.PI) / 180;
+        const lon = (s.lonDeg * Math.PI) / 180;
+        const r = this.planetRadius * 1.036;
+        const pos = new THREE.Vector3(
+          Math.cos(lat) * Math.cos(lon) * r,
+          Math.sin(lat) * r,
+          Math.cos(lat) * Math.sin(lon) * r
+        );
+        const geo = new THREE.RingGeometry(0.08, 0.16, 16);
+        const mat = new THREE.MeshBasicMaterial({ color: 0xfacc15, side: THREE.DoubleSide, depthTest: false });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.position.copy(pos);
+        mesh.lookAt(pos.clone().multiplyScalar(2));
+        this.expeditionGroup.add(mesh);
+      }
+    }
   }
 
   private syncFaunaPoints(world: WorldSimulation, seaLevel: number): void {

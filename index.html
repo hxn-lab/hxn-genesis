@@ -50,6 +50,30 @@
             <div class="time-sub" id="readout-time-breakdown">0 s | 0.00 hr | 0.00 d</div>
           </div>
           <button
+            id="btn-cmd-palette"
+            class="btn"
+            data-i18n="btn.cmd_palette"
+            title="Open Searchable Command Palette (Ctrl+K or /)"
+          >
+            ⌘ Command (Ctrl+K)
+          </button>
+          <button
+            id="btn-toggle-magnetosphere"
+            class="btn"
+            data-i18n="btn.magnetosphere"
+            title="Toggle 3D Magnetosphere & Solar Wind Field Lines"
+          >
+            🧲 Magnetosphere 3D
+          </button>
+          <button
+            id="btn-presentation-tour"
+            class="btn"
+            data-i18n="btn.presentation"
+            title="Step Through Guided Presentation Tour"
+          >
+            🎬 Tour Mode
+          </button>
+          <button
             id="btn-ui-mode"
             class="btn"
             data-i18n="btn.mode_creator"
@@ -96,6 +120,8 @@
           <button class="tab-btn" data-tab="tab-climate" data-i18n="tab.climate">Atmosphere</button>
           <button class="tab-btn" data-tab="tab-sculpt" data-i18n="tab.sculpt">Life & Hazards</button>
           <button class="tab-btn" data-tab="tab-evolab" data-i18n="tab.evolab">🧬 Evo Lab</button>
+          <button class="tab-btn" data-tab="tab-explore" data-i18n="tab.explore">🧭 Frontier</button>
+          <button class="tab-btn" data-tab="tab-science" data-i18n="tab.science">🛰 Science Lab</button>
           <button class="tab-btn" data-tab="tab-history" data-i18n="tab.history">Save & Log</button>
         </div>
 
@@ -363,6 +389,9 @@
             <button class="btn layer-btn" data-layer="PRECIPITATION" data-i18n="layer.precipitation">🌧 Precipitation</button>
             <button class="btn layer-btn" data-layer="ICE" data-i18n="layer.ice">❄ Cryosphere Ice</button>
             <button class="btn layer-btn" data-layer="WIND" data-i18n="layer.wind">💨 Wind Velocity</button>
+            <button class="btn layer-btn" data-layer="RADIATION" data-i18n="layer.radiation">☢ Radiation</button>
+            <button class="btn layer-btn" data-layer="MINERALS" data-i18n="layer.minerals">⛏ Minerals</button>
+            <button class="btn layer-btn" data-layer="CIVILIZATION" data-i18n="layer.civilization" style="grid-column: span 2;">🏛 Civilization</button>
           </div>
 
           <div class="button-row-2" style="margin-top: 6px;">
@@ -709,6 +738,139 @@
           <div id="species-explorer-list" class="species-list"></div>
         </section>
 
+        <!-- TAB EXP-1: Planetary Frontier (Exploration, Civilization, Terraforming, Missions & Modding) -->
+        <section id="tab-explore" class="tab-content">
+          <div class="section-header" data-i18n="section.exploration">1. Planetary Exploration & Surface Expedition</div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>Camera Flight Speed</span>
+              <strong id="val-cam-speed">1.0x</strong>
+            </div>
+            <input id="slider-cam-speed" type="range" min="0.3" max="3.0" step="0.1" value="1.0" />
+          </div>
+          <div class="button-row-2">
+            <button id="btn-eval-landing-sites" class="btn btn-accent">🛰 Evaluate Landing Sites</button>
+            <button id="btn-scan-expedition" class="btn btn-primary">🔬 Scan Selected Site</button>
+          </div>
+          <div class="inline-input-group" style="margin-top: 6px;">
+            <input id="input-bookmark-label" type="text" placeholder="Bookmark / Region name..." />
+            <button id="btn-add-bookmark" class="btn">+ Bookmark</button>
+          </div>
+          <div id="exploration-sites-list" class="scroll-list" style="max-height: 110px; margin-top: 6px;"></div>
+          <div id="exploration-discoveries-list" class="scroll-list" style="max-height: 120px; margin-top: 6px;"></div>
+
+          <div class="section-header" data-i18n="section.civilization">3. Civilization & Intelligent Life Sandbox</div>
+          <div class="button-row-2">
+            <button id="btn-spawn-civ" class="btn btn-accent">🏛 Found Civilization Here</button>
+            <button id="btn-civ-renewables" class="btn">⚡ Boost Renewables</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 4px;">
+            <button id="btn-civ-restore" class="btn">🌱 Eco-Stewardship</button>
+            <button id="btn-civ-accord" class="btn">🤝 Diplomatic Accord</button>
+          </div>
+          <div id="civilization-list" class="scroll-list" style="max-height: 125px; margin-top: 6px;"></div>
+
+          <div class="section-header" data-i18n="section.terraforming">4. Planetary Engineering & Terraforming Lab</div>
+          <div class="control-row">
+            <select id="select-terraform-kind">
+              <option value="ATMOSPHERE_PROCESSING">Atmosphere Processing (+Pressure/+O₂)</option>
+              <option value="GREENHOUSE_GAS_ADJUSTMENT">Greenhouse Gas Injection/Scrubbing</option>
+              <option value="ORBITAL_MIRROR_ARRAY">Orbital Solar Mirror Array</option>
+              <option value="WATER_IMPORT_COMETS">Cometary Water Import</option>
+              <option value="ICE_RELOCATION">Cryosphere Ice Relocation</option>
+              <option value="MAGNETIC_SHIELD_GENERATOR">L1 Artificial Magnetic Shield</option>
+              <option value="ALBEDO_MODIFICATION">Surface Albedo Modification</option>
+              <option value="CONTROLLED_HEATING_COOLING">Controlled Thermal Forcing</option>
+            </select>
+          </div>
+          <div class="slider-group">
+            <div class="slider-label">
+              <span>Engineering Intensity [-1.5 .. +1.5]</span>
+              <strong id="val-terraform-intensity">+0.60</strong>
+            </div>
+            <input id="slider-terraform-intensity" type="range" min="-1.5" max="1.5" step="0.1" value="0.6" />
+          </div>
+          <div class="button-row-2">
+            <button id="btn-launch-terraform" class="btn btn-primary">🚀 Launch Project</button>
+            <button id="btn-branch-terraform" class="btn">⎇ Record Branch</button>
+          </div>
+          <div id="terraforming-projects-list" class="scroll-list" style="max-height: 120px; margin-top: 6px;"></div>
+
+          <div class="section-header" data-i18n="section.missions_mods">10–12. Procedural Missions, Extensions & Accessibility</div>
+          <div class="button-row-2">
+            <button id="btn-new-proc-mission" class="btn btn-accent">🎯 New Procedural Mission</button>
+            <button id="btn-apply-example-mod" class="btn">🧩 Apply Cryo-Moon Mod</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 4px;">
+            <button id="btn-toggle-contrast" class="btn">◑ High Contrast</button>
+            <select id="select-color-vision" style="font-size: 11px;">
+              <option value="STANDARD">Palette: Standard</option>
+              <option value="DEUTERANOPIA_SAFE">Deuteranopia Safe</option>
+              <option value="PROTANOPIA_SAFE">Protanopia Safe</option>
+              <option value="TRITANOPIA_SAFE">Tritanopia Safe</option>
+            </select>
+          </div>
+          <div id="missions-mods-list" class="scroll-list" style="max-height: 125px; margin-top: 6px;"></div>
+        </section>
+
+        <!-- TAB EXP-2: Planetary Science Lab (Geochemistry, Space Weather, Remote Sensing, Magnetism, Stratigraphy, Analytics) -->
+        <section id="tab-science" class="tab-content">
+          <div class="section-header" data-i18n="section.magnetism">7. Planetary Magnetosphere & Radiation Shielding</div>
+          <div class="button-row-2">
+            <button class="btn mag-preset-btn" data-mag="EARTH_LIKE">Earth Dipole (1x)</button>
+            <button class="btn mag-preset-btn" data-mag="SUPER_MAGNETOSPHERE">Super-Dynamo (3.5x)</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 4px;">
+            <button class="btn mag-preset-btn" data-mag="WEAK_FIELD">Weak Field (0.2x)</button>
+            <button class="btn mag-preset-btn" data-mag="UNMAGNETIZED">Unmagnetized (0x)</button>
+          </div>
+          <div id="magnetosphere-readout" class="honesty-box" style="margin-top: 6px;"></div>
+
+          <div class="section-header" data-i18n="section.space_weather">5. Asteroid Defense & Space Weather</div>
+          <div class="button-row-2">
+            <button id="btn-spawn-asteroid" class="btn btn-warn">☄ Track Approaching NEO</button>
+            <button id="btn-deflect-asteroid" class="btn btn-accent">🛰 Kinetic Deflection</button>
+          </div>
+          <div class="button-row-2" style="margin-top: 4px;">
+            <button id="btn-space-flare" class="btn">☀ Stellar Superflare</button>
+            <button id="btn-space-cme" class="btn">⚡ CME Storm</button>
+          </div>
+          <div id="space-weather-list" class="scroll-list" style="max-height: 110px; margin-top: 6px;"></div>
+
+          <div class="section-header" data-i18n="section.geochemistry">2. Geochemical Cycles & Resource Extraction</div>
+          <div class="button-row-2">
+            <button id="btn-extract-iron" class="btn">⛏ Extract Iron Ore</button>
+            <button id="btn-extract-carbon" class="btn btn-warn">🛢 Burn Hydrocarbons</button>
+          </div>
+          <div id="geochemistry-readout" class="honesty-box" style="margin-top: 6px;"></div>
+
+          <div class="section-header" data-i18n="section.remote_sensing">6. Remote Sensing & Synthetic Spectroscopy</div>
+          <div class="button-row-2">
+            <select id="select-obs-mode">
+              <option value="VISIBLE">Visible Reflectance</option>
+              <option value="INFRARED">Near-IR Spectroscopy</option>
+              <option value="THERMAL">Thermal Emission</option>
+              <option value="RADAR">Synthetic Aperture Radar</option>
+            </select>
+            <button id="btn-run-observation" class="btn btn-primary">🔭 Observe</button>
+          </div>
+          <div id="remote-sensing-readout" class="honesty-box" style="margin-top: 6px;"></div>
+
+          <div class="section-header" data-i18n="section.stratigraphy">8. Stratigraphic Column & Fossil Record</div>
+          <button id="btn-record-strata" class="btn" style="width: 100%;">🪨 Core Sample & Reconstruct Paleo-Horizon</button>
+          <div id="stratigraphy-list" class="scroll-list" style="max-height: 115px; margin-top: 6px;"></div>
+
+          <div class="section-header" data-i18n="section.analytics">9. Causal Attribution, Correlation & Monte Carlo</div>
+          <div class="button-row-2">
+            <button id="btn-run-correlation" class="btn">📈 Correlation & Causal Chain</button>
+            <button id="btn-run-montecarlo" class="btn btn-accent">🎲 Monte Carlo Ensemble</button>
+          </div>
+          <div style="margin-top: 4px;">
+            <button id="btn-export-csv" class="btn" style="width: 100%;">⬇ Export Time-Series CSV</button>
+          </div>
+          <div id="analytics-readout" class="honesty-box" style="margin-top: 6px;"></div>
+        </section>
+
         <!-- TAB 5: Checkpoints, Save/Load & Timeline -->
         <section id="tab-history" class="tab-content">
           <div class="section-header" data-i18n="section.checkpoints">Checkpoints & JSON State Persistence</div>
@@ -884,6 +1046,20 @@
             <button id="btn-help-restart-tour" class="btn btn-accent" data-i18n="help.btn_restart_tour">🎓 Restart 10-Step Interactive Tutorial</button>
           </div>
           <div id="help-topics-list" class="help-topics-grid"></div>
+        </div>
+      </div>
+
+      <!-- Searchable Command Palette Modal (Ctrl+K) -->
+      <div id="cmd-palette-modal" class="modal-backdrop" style="display: none;">
+        <div class="modal-card modal-wide glass-panel">
+          <div class="modal-header-row">
+            <h2 class="modal-title">⌘ Command Palette & Quick Actions</h2>
+            <button id="btn-cmd-close" class="btn">✕ Esc</button>
+          </div>
+          <div class="control-row" style="margin: 8px 0;">
+            <input id="input-cmd-search" type="text" placeholder="Type a command, layer, experiment, or tab..." />
+          </div>
+          <div id="cmd-actions-list" class="scroll-list" style="max-height: 280px;"></div>
         </div>
       </div>
     </div>

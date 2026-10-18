@@ -363,7 +363,25 @@ export const TRANSLATIONS = {
     'help.modal_title': 'HXN GENESIS 3.0 — Controls, Shortcuts & Scientific Guide',
     'help.search_placeholder': 'Search controls, keyboard shortcuts, or physics models...',
     'help.btn_restart_tour': '🎓 Restart 10-Step Interactive Tutorial',
-    'help.btn_close': '✕ Close'
+    'help.btn_close': '✕ Close',
+    'tab.explore': '🧭 Frontier',
+    'tab.science': '🛰 Science Lab',
+    'layer.radiation': '☢ Radiation',
+    'layer.minerals': '⛏ Minerals',
+    'layer.civilization': '🏛 Civilization',
+    'btn.cmd_palette': '⌘ Command (Ctrl+K)',
+    'btn.magnetosphere': '🧲 Magnetosphere 3D',
+    'btn.presentation': '🎬 Tour Mode',
+    'section.exploration': '1. Planetary Exploration & Surface Expedition',
+    'section.geochemistry': '2. Geochemical Cycles & Resource Extraction',
+    'section.civilization': '3. Civilization & Intelligent Life Sandbox',
+    'section.terraforming': '4. Planetary Engineering & Terraforming Lab',
+    'section.space_weather': '5. Asteroid Defense & Space Weather',
+    'section.remote_sensing': '6. Remote Sensing & Synthetic Spectroscopy',
+    'section.magnetism': '7. Planetary Magnetosphere & Radiation Shielding',
+    'section.stratigraphy': '8. Stratigraphic Column & Fossil Record',
+    'section.analytics': '9. Causal Attribution, Correlation & Monte Carlo',
+    'section.missions_mods': '10–12. Procedural Missions, Extensions & Accessibility'
   },
   vi: {
     'app.title': 'HXN GENESIS — Mô Phỏng Hành Tinh Sống & Tiến Hóa Toàn Diện',
@@ -718,7 +736,25 @@ export const TRANSLATIONS = {
     'help.modal_title': 'HXN GENESIS 3.0 — Hướng Dẫn Điều Khiển, Phím Tắt & Cơ Sở Khoa Học',
     'help.search_placeholder': 'Tìm kiếm công cụ, phím tắt bàn phím, hoặc mô hình vật lý...',
     'help.btn_restart_tour': '🎓 Mở Lại Hướng Dẫn Tương Tác 10 Bước',
-    'help.btn_close': '✕ Đóng'
+    'help.btn_close': '✕ Đóng',
+    'tab.explore': '🧭 Thám Hiểm',
+    'tab.science': '🛰 Phòng Lab',
+    'layer.radiation': '☢ Bức Xạ',
+    'layer.minerals': '⛏ Khoáng Sản',
+    'layer.civilization': '🏛 Văn Minh',
+    'btn.cmd_palette': '⌘ Lệnh Nhanh (Ctrl+K)',
+    'btn.magnetosphere': '🧲 Từ Quyển 3D',
+    'btn.presentation': '🎬 Trình Chiếu',
+    'section.exploration': '1. Thám Hiểm Bề Mặt & Bản Đồ Hành Tinh',
+    'section.geochemistry': '2. Chu Trình Địa Hóa & Khai Thác Tài Nguyên',
+    'section.civilization': '3. Văn Minh Thông Minh & Đô Thị Hóa',
+    'section.terraforming': '4. Kỹ Thuật Cải Tạo Hành Tinh (Terraforming)',
+    'section.space_weather': '5. Phòng Thủ Thiên Thạch & Thời Tiết Vũ Trụ',
+    'section.remote_sensing': '6. Viễn Thám & Quang Phổ Ngoại Hành Tinh',
+    'section.magnetism': '7. Từ Quyển Hành Tinh & Lá Chắn Bức Xạ',
+    'section.stratigraphy': '8. Cột Địa Tầng & Hồ Sơ Hóa Thạch',
+    'section.analytics': '9. Phân Tích Nhân Quả, Tương Quan & Monte Carlo',
+    'section.missions_mods': '10–12. Nhiệm Vụ, Tiện Ích Mở Rộng & Trợ Năng'
   }
 } as const;
 
