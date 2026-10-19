@@ -12,7 +12,7 @@ Every new world starts strictly **abiotic** (0% life). You can forge a planet fr
 2. [Screenshots & How to Capture Visuals](#2-screenshots--how-to-capture-visuals)
 3. [Hardware & Software Requirements](#3-hardware--software-requirements)
 4. [Installing Node.js, npm, and Git (Windows, Linux, macOS)](#4-installing-nodejs-npm-and-git-windows-linux-macos)
-5. [Downloading the Source Code](#5-downloading-the-source-code)
+5. [Downloading & Publishing with GitHub](#5-downloading--publishing-with-github)
 6. [Opening the Terminal in the Project Directory](#6-opening-the-terminal-in-the-project-directory)
 7. [Installing Dependencies & Launching the Application](#7-installing-dependencies--launching-the-application)
 8. [Running Tests, Benchmarks & Production Builds](#8-running-tests-benchmarks--production-builds)
@@ -156,17 +156,66 @@ No pre-rendered static screenshots are bundled in the repository to keep the rep
 
 ---
 
-## 5. Downloading the Source Code
+## 5. Downloading & Publishing with GitHub
 
-### Option A: Clone via Git (Recommended)
+### A. Clone the Repository (Recommended)
+You can clone the repository to your local machine using either HTTPS or SSH:
+
 ```bash
-git clone <YOUR_GITHUB_REPOSITORY_URL> HXN
+# Clone using HTTPS:
+git clone https://github.com/hxn-lab/hxn-genesis.git
+
+# Or clone using SSH:
+git clone git@github.com:hxn-lab/hxn-genesis.git
+
+# Enter the project directory:
+cd hxn-genesis
 ```
 
-### Option B: Download ZIP from GitHub
-1. Click the green **`<> Code`** button on the GitHub repository page.
-2. Select **Download ZIP**.
-3. Extract the `.zip` archive to a folder on your computer (for example, `C:\Projects\HXN` on Windows or `~/HXN` on Linux/macOS).
+### B. Download ZIP Archive
+1. Visit the repository page: [https://github.com/hxn-lab/hxn-genesis](https://github.com/hxn-lab/hxn-genesis)
+2. Click the green **`<> Code`** button and select **Download ZIP**.
+3. Extract the `.zip` archive to a folder on your computer (e.g., `C:\Projects\hxn-genesis` on Windows or `~/hxn-genesis` on Linux/macOS).
+
+### C. Staging, Committing & Pushing Changes to GitHub
+To push local changes and updates back to GitHub:
+
+1. **Check status of modified and untracked files**:
+   ```bash
+   git status
+   ```
+
+2. **Verify tests and production build before pushing**:
+   ```bash
+   npm test
+   npm run build
+   ```
+
+3. **Stage changed files**:
+   ```bash
+   # Stage all modified and new files:
+   git add .
+   # Or stage specific files:
+   # git add README.md src/
+   ```
+
+4. **Commit with a descriptive message**:
+   ```bash
+   git commit -m "feat: describe your improvements or fixes"
+   ```
+
+5. **Push commits to the GitHub repository**:
+   ```bash
+   git push origin main
+   ```
+
+> [!NOTE]
+> If you are initializing a fresh local repository or connecting a newly cloned folder:
+> ```bash
+> git remote add origin https://github.com/hxn-lab/hxn-genesis.git
+> git branch -M main
+> git push -u origin main
+> ```
 
 ---
 
@@ -438,8 +487,10 @@ HXN GENESIS implements physically motivated, coupled reduced-complexity models d
 ## 13. License, Contributing & Contact
 
 - **Project**: HXN GENESIS — Infinite-Time Planetary Environment Sandbox
-- **Status**: Private / Local Sandbox Repository (`"private": true` in `package.json`). No open-source license file is currently declared in the repository root; all rights remain with the repository owner unless a `LICENSE` file is added.
-- **Contributing**:
+- **Repository**: [https://github.com/hxn-lab/hxn-genesis](https://github.com/hxn-lab/hxn-genesis)
+- **Status**: Local Sandbox Repository (`"private": true` in `package.json`). No open-source license file is currently declared in the repository root; all rights remain with the repository owner unless a `LICENSE` file is added.
+- **Contributing & Pull Requests**:
   1. Ensure all existing and new tests pass via `npm test`.
   2. Verify strict TypeScript compilation and production bundling via `npm run build`.
   3. Keep `src/sim/` independent of rendering and DOM APIs, and add both `en` and `vi` keys in `src/i18n/index.ts` for any new UI text.
+  4. Follow conventional commit format (`feat:`, `fix:`, `docs:`, `perf:`) when creating commits and pushing to GitHub.
