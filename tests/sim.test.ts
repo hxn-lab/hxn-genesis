@@ -800,6 +800,66 @@ describe('HXN GENESIS 3.0 — 18+ Automated Acceptance Tests: Planet Creator, Sc
     );
     expect(filtered.length).toBe(1);
   });
+
+  it('28. Snapshot deep clone isolation, non-finite guard rejection, flora trophic role seeding & analytics robustness', () => {
+    // 1. Snapshot deep clone independence
+    const world1 = new WorldSimulation(72, 36, 'Earth-like', 'CLONE-ISOLATION-SEED');
+    const snap = world1.serializeSnapshot('Deep Clone Base');
+    const origElev0 = world1.elevation[0];
+    snap.elevation[0] = 99999;
+    expect(world1.elevation[0]).toBe(origElev0);
+
+    const migrated = migrateSnapshotToV4(snap);
+    migrated.elevation[0] = -12345;
+    expect(snap.elevation[0]).toBe(99999);
+
+    // 2. Non-finite array values in optional snapshot fields rejected
+    const corruptHumidity = {
+      ...snap,
+      humidity: Array.from(snap.elevation).map((_, i) => (i === 5 ? NaN : 0.5))
+    };
+    expect(() => migrateSnapshotToV4(corruptHumidity as any)).toThrow(/corrupted numerical values/i);
+
+    const corruptIce = {
+      ...snap,
+      iceThickness: Array.from(snap.elevation).map((_, i) => (i === 10 ? Infinity : 0))
+    };
+    expect(() => migrateSnapshotToV4(corruptIce as any)).toThrow(/corrupted numerical values/i);
+
+    // 3. advanceFrame & singleStep guards
+    const stepsBefore = world1.timeState.stepsComputed;
+    world1.advanceFrame(NaN);
+    expect(world1.timeState.stepsComputed).toBe(stepsBefore);
+    world1.advanceFrame(-1);
+    expect(world1.timeState.stepsComputed).toBe(stepsBefore);
+    world1.advanceFrame(0);
+    expect(world1.timeState.stepsComputed).toBe(stepsBefore);
+
+    world1.singleStep();
+    expect(world1.timeState.stepsComputed).toBe(stepsBefore + 1);
+
+    // 4. Seeding FLORA establishes PRODUCER_FLORA trophic guild and biomass
+    const world2 = new WorldSimulation(72, 36, 'Earth-like', 'FLORA-SEED-TEST');
+    world2.seedLifeAtLatLon('FLORA', 0, 0, 0.8, 0.5);
+    const hasBiomass = Array.from(world2.biomass).some((b) => b > 0);
+    expect(hasBiomass).toBe(true);
+    const floraLineage = world2.speciesLineages.find((s) => s.guild === 'PRODUCER_FLORA');
+    expect(floraLineage).toBeDefined();
+
+    // 5. Analytics robustness: correlation handles NaNs safely and returns finite pearsonR
+    const nanHistory = [
+      { step: 1, yearsNumeric: 1, timeLabel: '1y', meanTempC: NaN, co2Ppm: 280, o2Percent: 21, biomassPercent: 10, faunaPercent: 1, livingSpeciesCount: 2, biodiversityIndex: 1, habitabilityPercent: 50, extinctionSeverityPercent: 0 },
+      { step: 2, yearsNumeric: 2, timeLabel: '2y', meanTempC: 15, co2Ppm: 300, o2Percent: 21, biomassPercent: 12, faunaPercent: 1, livingSpeciesCount: 2, biodiversityIndex: 1, habitabilityPercent: 52, extinctionSeverityPercent: 0 },
+      { step: 3, yearsNumeric: 3, timeLabel: '3y', meanTempC: 16, co2Ppm: 320, o2Percent: 21, biomassPercent: 14, faunaPercent: 1, livingSpeciesCount: 2, biodiversityIndex: 1, habitabilityPercent: 54, extinctionSeverityPercent: 0 }
+    ];
+    const corr = computeMetricCorrelation(nanHistory, 'meanTempC', 'co2Ppm');
+    expect(Number.isFinite(corr.pearsonR)).toBe(true);
+    expect(corr.pearsonR).toBeGreaterThanOrEqual(-1);
+    expect(corr.pearsonR).toBeLessThanOrEqual(1);
+
+    // 6. Sensitivity sweep bounds parameter inputs
+    const hugeValues = Array.from({ length: 40 }, (_, i) => 0.8 + i * 0.02);
+    const sweep = runParameterSensitivitySweep('SWEEP-SEED-2', 'Earth-like', 'solarLuminosity', hugeValues);
+    expect(sweep.points.length).toBeLessThanOrEqual(16);
+  });
 });
-
-

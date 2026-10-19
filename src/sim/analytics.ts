@@ -67,9 +67,19 @@ export function computeMetricCorrelation(
   metricX: AnalyticsMetricKey,
   metricY: AnalyticsMetricKey
 ): CorrelationReport {
-  const n = history.length;
   const disclaimer =
     'Statistical correlation measures historical co-variation only and does not prove direct physical causation without controlled perturbation.';
+
+  const validPairs: [number, number][] = [];
+  for (const h of history) {
+    const x = Number(h[metricX]);
+    const y = Number(h[metricY]);
+    if (Number.isFinite(x) && Number.isFinite(y)) {
+      validPairs.push([x, y]);
+    }
+  }
+
+  const n = validPairs.length;
   if (n < 2) {
     return {
       metricX,
@@ -81,8 +91,8 @@ export function computeMetricCorrelation(
     };
   }
 
-  const xs = history.map((h) => Number(h[metricX] ?? 0));
-  const ys = history.map((h) => Number(h[metricY] ?? 0));
+  const xs = validPairs.map((p) => p[0]);
+  const ys = validPairs.map((p) => p[1]);
   const meanX = xs.reduce((a, b) => a + b, 0) / n;
   const meanY = ys.reduce((a, b) => a + b, 0) / n;
 
@@ -98,7 +108,12 @@ export function computeMetricCorrelation(
   }
 
   const denom = Math.sqrt(denX * denY);
-  const r = denom > 1e-12 ? Math.max(-1, Math.min(1, num / denom)) : 0;
+  let r = 0;
+  if (denom > 1e-12 && Number.isFinite(num) && Number.isFinite(denom)) {
+    const rawR = num / denom;
+    r = Math.max(-1, Math.min(1, rawR));
+  }
+  if (!Number.isFinite(r)) r = 0;
 
   let strengthLabel: CorrelationReport['strengthLabel'] = 'WEAK_OR_NONE';
   if (r >= 0.7) strengthLabel = 'STRONG_POSITIVE';
@@ -121,13 +136,35 @@ export function buildCausalAttributionChains(
   eventLog: SimEventLogEntry[]
 ): CausalEventChainNode[] {
   const chains: CausalEventChainNode[] = [];
-  const prev = history.length >= 2 ? history[0] : null;
-  const latest = history.length >= 1 ? history[history.length - 1] : null;
+  const globalPrev = history.length >= 2 ? history[0] : null;
+  const globalLatest = history.length >= 1 ? history[history.length - 1] : null;
 
   for (const ev of eventLog.slice(0, 12)) {
-    const dTemp = prev && latest ? Number((latest.meanTempC - prev.meanTempC).toFixed(2)) : 0;
-    const dHab = prev && latest ? Number((latest.habitabilityPercent - prev.habitabilityPercent).toFixed(1)) : 0;
-    const dBio = prev && latest ? Number((latest.biomassPercent - prev.biomassPercent).toFixed(1)) : 0;
+    const eventStep = parseInt(ev.id.split('-')[0], 10);
+    let beforePt: TelemetryHistoryPoint | null = null;
+    let afterPt: TelemetryHistoryPoint | null = null;
+
+    if (Number.isFinite(eventStep) && history.length > 0) {
+      for (let i = history.length - 1; i >= 0; i--) {
+        if (history[i].step <= eventStep) {
+          beforePt = history[i];
+          break;
+        }
+      }
+      for (let i = 0; i < history.length; i++) {
+        if (history[i].step > eventStep) {
+          afterPt = history[i];
+          break;
+        }
+      }
+    }
+
+    const prev = beforePt ?? globalPrev;
+    const next = afterPt ?? globalLatest;
+
+    const dTemp = prev && next ? Number((next.meanTempC - prev.meanTempC).toFixed(2)) : 0;
+    const dHab = prev && next ? Number((next.habitabilityPercent - prev.habitabilityPercent).toFixed(1)) : 0;
+    const dBio = prev && next ? Number((next.biomassPercent - prev.biomassPercent).toFixed(1)) : 0;
 
     const downstream: string[] = [];
     if (Math.abs(dTemp) > 0.8) downstream.push(`Thermal forcing shift (${dTemp >= 0 ? '+' : ''}${dTemp} °C)`);
@@ -157,8 +194,9 @@ export function runParameterSensitivitySweep(
   values: number[]
 ): SensitivitySweepResult {
   const points: SensitivityPoint[] = [];
+  const safeValues = values.slice(0, 16);
 
-  for (const val of values) {
+  for (const val of safeValues) {
     const sim = new WorldSimulation(36, 18, preset, seed);
     sim.params[parameterName] = val;
     sim.singleStep(3600 * 24 * 365 * 5000);

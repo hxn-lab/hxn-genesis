@@ -46,6 +46,7 @@ export const EARTH_GRAVITY_MS2 = 9.80665;
 export const EARTH_DENSITY_GCM3 = 5.514;
 export const EARTH_ESCAPE_KMS = 11.186;
 export const DRY_ADIABATIC_EARTH_ENV_LAPSE = 0.0065; // K/m environmental lapse rate at 1 g
+export const LAPSE_RATE_K_PER_M = DRY_ADIABATIC_EARTH_ENV_LAPSE;
 
 /** Main-sequence luminosity relative to the Sun (representative values). */
 export const STAR_LUMINOSITY: Record<StarType, number> = {

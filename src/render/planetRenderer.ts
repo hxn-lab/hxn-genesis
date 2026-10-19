@@ -769,6 +769,13 @@ export class PlanetRenderer {
     while (this.expeditionGroup.children.length > 0) {
       const child = this.expeditionGroup.children[0] as THREE.Mesh;
       child.geometry?.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
       this.expeditionGroup.remove(child);
     }
 
@@ -845,6 +852,13 @@ export class PlanetRenderer {
     while (this.hazardGroup.children.length > 0) {
       const child = this.hazardGroup.children[0] as THREE.Mesh;
       child.geometry?.dispose();
+      if (child.material) {
+        if (Array.isArray(child.material)) {
+          child.material.forEach((m) => m.dispose());
+        } else {
+          child.material.dispose();
+        }
+      }
       this.hazardGroup.remove(child);
     }
 
@@ -951,7 +965,8 @@ export class PlanetRenderer {
   }
 
   public resize(width: number, height: number): void {
-    this.camera.aspect = width / Math.max(1, height);
+    if (width <= 0 || height <= 0 || !Number.isFinite(width) || !Number.isFinite(height)) return;
+    this.camera.aspect = width / height;
     this.camera.updateProjectionMatrix();
     this.renderer.setSize(width, height);
   }
@@ -968,5 +983,53 @@ export class PlanetRenderer {
     }
     this.controls.update();
     this.renderer.render(this.scene, this.camera);
+  }
+
+  public dispose(): void {
+    this.renderer.dispose();
+    this.controls.dispose();
+
+    this.terrainGeo.dispose();
+    (this.terrainMesh.material as THREE.Material).dispose();
+
+    this.oceanGeo.dispose();
+    (this.oceanMesh.material as THREE.Material).dispose();
+
+    this.cloudTexture.dispose();
+    (this.cloudMesh.geometry as THREE.BufferGeometry).dispose();
+    (this.cloudMesh.material as THREE.Material).dispose();
+
+    (this.atmosphereMesh.geometry as THREE.BufferGeometry).dispose();
+    (this.atmosphereMesh.material as THREE.Material).dispose();
+
+    (this.selectionRing.geometry as THREE.BufferGeometry).dispose();
+    (this.selectionRing.material as THREE.Material).dispose();
+
+    (this.hoverPreviewRing.geometry as THREE.BufferGeometry).dispose();
+    (this.hoverPreviewRing.material as THREE.Material).dispose();
+
+    this.faunaGeo.dispose();
+    (this.faunaPoints.material as THREE.Material).dispose();
+
+    const disposeGroup = (group: THREE.Group) => {
+      while (group.children.length > 0) {
+        const c = group.children[0] as THREE.Mesh | THREE.Line;
+        c.geometry?.dispose();
+        if (c.material) {
+          if (Array.isArray(c.material)) c.material.forEach((m) => m.dispose());
+          else c.material.dispose();
+        }
+        group.remove(c);
+      }
+    };
+
+    disposeGroup(this.hazardGroup);
+    disposeGroup(this.expeditionGroup);
+    disposeGroup(this.graticuleGroup);
+    disposeGroup(this.magnetosphereGroup);
+
+    if (this.renderer.domElement.parentElement) {
+      this.renderer.domElement.parentElement.removeChild(this.renderer.domElement);
+    }
   }
 }

@@ -1322,7 +1322,7 @@ export class WorldSimulation {
   }
 
   public advanceFrame(realElapsedSeconds: number): void {
-    if (this.paused || realElapsedSeconds <= 0) return;
+    if (this.paused || !Number.isFinite(realElapsedSeconds) || realElapsedSeconds <= 0) return;
 
     const clampedRealDt = Math.min(0.1, realElapsedSeconds);
     const deltaSimSecondsSci = scaleSciNumber(this.speedSci, clampedRealDt);
@@ -1330,7 +1330,8 @@ export class WorldSimulation {
   }
 
   public singleStep(stepSeconds = 600): void {
-    const dtSci = normalizeSci(stepSeconds, 0);
+    const safeStep = Number.isFinite(stepSeconds) && stepSeconds > 0 ? stepSeconds : 600;
+    const dtSci = normalizeSci(safeStep, 0);
     this.stepBySimSecondsSci(dtSci);
   }
 

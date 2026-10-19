@@ -1,7 +1,7 @@
-import { SafeSimTimeState, SciNumber, TimeExecutionMode } from './time';
-import { PlanetProperties } from './planetPhysics';
-import { TerrainSettings } from './terrainGen';
-import { GeologyParameters } from './geology';
+import type { SafeSimTimeState, SciNumber, TimeExecutionMode } from './time';
+import type { PlanetProperties } from './planetPhysics';
+import type { TerrainSettings } from './terrainGen';
+import type { GeologyParameters } from './geology';
 
 export type PresetName =
   | 'Earth-like'
@@ -250,18 +250,18 @@ export interface CellInspection {
   biome: BiomeClassification;
 }
 
-import { MagnetosphereState } from './magnetism';
-import { SpaceWeatherState } from './spaceWeather';
-import { GeochemistryState } from './geochemistry';
-import { NaturalHistoryState } from './naturalHistory';
-import { ExplorationState } from './exploration';
-import { RemoteSensingState } from './remoteSensing';
-import { CivilizationState } from './civilization';
-import { TerraformingState } from './terraforming';
-import { MissionSystemState } from './missions';
-import { ModdingSystemState } from './modding';
-
-export interface SerializedWorldSnapshot {
+export interface SerializedWorldSnapshot<
+  TMag = any,
+  TSpace = any,
+  TGeo = any,
+  TNat = any,
+  TExp = any,
+  TRs = any,
+  TCiv = any,
+  TTf = any,
+  TMis = any,
+  TMod = any
+> {
   version: number;
   label: string;
   createdAtIso: string;
@@ -288,15 +288,15 @@ export interface SerializedWorldSnapshot {
   telemetryHistory?: TelemetryHistoryPoint[];
   activeHazards: ActiveHazardEvent[];
   eventLog: SimEventLogEntry[];
-  magnetosphere?: MagnetosphereState;
-  spaceWeather?: SpaceWeatherState;
-  geochemistry?: GeochemistryState;
-  naturalHistory?: NaturalHistoryState;
-  exploration?: ExplorationState;
-  remoteSensing?: RemoteSensingState;
-  civilization?: CivilizationState;
-  terraforming?: TerraformingState;
-  missions?: MissionSystemState;
-  modding?: ModdingSystemState;
+  magnetosphere?: TMag;
+  spaceWeather?: TSpace;
+  geochemistry?: TGeo;
+  naturalHistory?: TNat;
+  exploration?: TExp;
+  remoteSensing?: TRs;
+  civilization?: TCiv;
+  terraforming?: TTf;
+  missions?: TMis;
+  modding?: TMod;
 }
 

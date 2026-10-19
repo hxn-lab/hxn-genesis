@@ -433,6 +433,11 @@ class HxnGenesisApp {
 
     // Custom scientific speed input (supports 1e100, etc.)
     const inputCustomSpeed = document.getElementById('input-custom-speed') as HTMLInputElement;
+    inputCustomSpeed.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('btn-apply-speed')?.click();
+      }
+    });
     document.getElementById('btn-apply-speed')!.addEventListener('click', () => {
       try {
         const parsed = parseSciSpeed(inputCustomSpeed.value);
@@ -449,6 +454,11 @@ class HxnGenesisApp {
     // Preset & Seed controls
     const selectPreset = document.getElementById('select-preset') as HTMLSelectElement;
     const inputSeed = document.getElementById('input-seed') as HTMLInputElement;
+    inputSeed.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('btn-regen-seed')?.click();
+      }
+    });
 
     selectPreset.addEventListener('change', () => {
       const preset = selectPreset.value as PresetName;
@@ -847,7 +857,7 @@ class HxnGenesisApp {
 
     document.getElementById('btn-trigger-flora')!.addEventListener('click', () => {
       const radiusRad = (this.brushRadiusDeg * Math.PI) / 180;
-      this.world.seedLifeAtLatLon('FAUNA', this.selectedLat, this.selectedLon, this.brushStrength, radiusRad);
+      this.world.seedLifeAtLatLon('FLORA', this.selectedLat, this.selectedLon, this.brushStrength, radiusRad);
       this.syncSlidersFromParams();
       this.renderer.syncWithSimulation(this.world);
       this.updateUIReadouts();
@@ -902,10 +912,15 @@ class HxnGenesisApp {
     });
 
     // Checkpoints, World Library & Save/Load JSON
+    const labelInput = document.getElementById('input-checkpoint-name') as HTMLInputElement;
+    labelInput?.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') {
+        document.getElementById('btn-save-checkpoint')?.click();
+      }
+    });
     document.getElementById('btn-save-checkpoint')!.addEventListener('click', () => {
-      const labelInput = document.getElementById('input-checkpoint-name') as HTMLInputElement;
       const entries = this.worldLibrary.listWorlds();
-      const label = labelInput.value.trim() || `Epoch ${entries.length + 1}`;
+      const label = labelInput?.value.trim() || `Epoch ${entries.length + 1}`;
       const snap = this.world.serializeSnapshot(label);
       this.worldLibrary.saveWorld(label, snap);
       this.world.logEvent('SYSTEM', `Saved checkpoint "${label}"`);

@@ -40,7 +40,7 @@ function runResolutionBenchmark(width: number, height: number, iterations = 100)
 
   console.log(
     `Grid ${width}x${height} (${width * height} cells) | Init: ${initMs.toFixed(1)} ms | ` +
-    `REALTIME Step: ${avgStepMs.toFixed(2)} ms (${maxTheoreticalFps.toFixed(0)} FPS ceiling) | ` +
+    `REALTIME Step: ${avgStepMs.toFixed(2)} ms (${maxTheoreticalFps.toFixed(0)} sim-steps/sec ceiling) | ` +
     `COARSE (1e6x) Frame: ${avgCoarseFrameMs.toFixed(2)} ms | Heap Δ: ~${deltaHeapKb} KB`
   );
 }

@@ -4,7 +4,7 @@
  * Uses 3D unit-normal dot products on the sphere so all brushes are completely
  * seamless across the ±180° longitude boundary and free of polar singularities.
  */
-import { LAPSE_RATE_K_PER_M } from './world';
+import { LAPSE_RATE_K_PER_M } from './planetPhysics';
 import { craterProfile } from './terrainGen';
 
 export type SculptBrushTool =

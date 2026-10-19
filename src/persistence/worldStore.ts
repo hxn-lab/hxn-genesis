@@ -53,6 +53,37 @@ export function migrateSnapshotToV4(raw: unknown): SerializedWorldSnapshot {
     throw new Error('Corrupted snapshot array lengths do not match grid cell count.');
   }
 
+  const elevation = new Array<number>(numCells);
+  const temperature = new Array<number>(numCells);
+  for (let i = 0; i < numCells; i++) {
+    const elVal = Number(snap.elevation[i]);
+    const tVal = Number(snap.temperature[i]);
+    if (!Number.isFinite(elVal) || !Number.isFinite(tVal)) {
+      throw new Error('Corrupted numerical values (NaN/Infinity) detected in snapshot arrays.');
+    }
+    elevation[i] = elVal;
+    temperature[i] = tVal;
+  }
+
+  const validateOrCloneArray = (
+    rawArr: unknown,
+    fallbackVal: number,
+    fieldLabel: string
+  ): number[] => {
+    if (!Array.isArray(rawArr) || rawArr.length !== numCells) {
+      return new Array(numCells).fill(fallbackVal);
+    }
+    const cloned = new Array<number>(numCells);
+    for (let i = 0; i < numCells; i++) {
+      const v = Number(rawArr[i]);
+      if (!Number.isFinite(v)) {
+        throw new Error(`Corrupted numerical values (NaN/Infinity) detected in snapshot array: ${fieldLabel}`);
+      }
+      cloned[i] = v;
+    }
+    return cloned;
+  };
+
   const migratedParams = {
     o2Percent: 0.1,
     pressureBar: 1.0,
@@ -77,35 +108,40 @@ export function migrateSnapshotToV4(raw: unknown): SerializedWorldSnapshot {
     gridWidth: gw,
     gridHeight: gh,
     params: migratedParams,
-    timeState: snap.timeState,
-    speedSci: snap.speedSci || { mantissa: 1, exponent: 0 },
+    timeState: { ...snap.timeState },
+    speedSci: snap.speedSci ? { ...snap.speedSci } : { mantissa: 1, exponent: 0 },
     paused: Boolean(snap.paused),
-    elevation: snap.elevation,
-    temperature: snap.temperature,
-    humidity: Array.isArray(snap.humidity) && snap.humidity.length === numCells ? snap.humidity : new Array(numCells).fill(0.5),
-    precipitation: Array.isArray(snap.precipitation) && snap.precipitation.length === numCells ? snap.precipitation : new Array(numCells).fill(1.0),
-    iceThickness: Array.isArray(snap.iceThickness) && snap.iceThickness.length === numCells ? snap.iceThickness : new Array(numCells).fill(0),
-    waterWaveAnomaly: Array.isArray(snap.waterWaveAnomaly) && snap.waterWaveAnomaly.length === numCells ? snap.waterWaveAnomaly : new Array(numCells).fill(0),
-    volcanicHeat: Array.isArray(snap.volcanicHeat) && snap.volcanicHeat.length === numCells ? snap.volcanicHeat : new Array(numCells).fill(0),
-    sediment: Array.isArray(snap.sediment) && snap.sediment.length === numCells ? snap.sediment : new Array(numCells).fill(0),
-    biomass: Array.isArray(snap.biomass) && snap.biomass.length === numCells ? snap.biomass : new Array(numCells).fill(0),
-    fauna: Array.isArray(snap.fauna) && snap.fauna.length === numCells ? snap.fauna : new Array(numCells).fill(0),
-    biodiversity: Array.isArray(snap.biodiversity) && snap.biodiversity.length === numCells ? snap.biodiversity : new Array(numCells).fill(0),
-    extinctionImpact: Array.isArray(snap.extinctionImpact) && snap.extinctionImpact.length === numCells ? snap.extinctionImpact : new Array(numCells).fill(0),
-    speciesLineages: Array.isArray(snap.speciesLineages) ? snap.speciesLineages : [],
-    telemetryHistory: Array.isArray(snap.telemetryHistory) ? snap.telemetryHistory : [],
-    activeHazards: Array.isArray(snap.activeHazards) ? snap.activeHazards : [],
-    eventLog: Array.isArray(snap.eventLog) ? snap.eventLog : [],
-    magnetosphere: snap.magnetosphere ?? createDefaultMagnetosphereState(),
-    spaceWeather: snap.spaceWeather ?? createDefaultSpaceWeatherState(),
-    geochemistry: snap.geochemistry ?? createDefaultGeochemistryState(),
-    naturalHistory: snap.naturalHistory ?? createDefaultNaturalHistoryState(),
-    exploration: snap.exploration ?? createDefaultExplorationState(),
-    remoteSensing: snap.remoteSensing ?? createDefaultRemoteSensingState(),
-    civilization: snap.civilization ?? createDefaultCivilizationState(),
-    terraforming: snap.terraforming ?? createDefaultTerraformingState(),
-    missions: snap.missions ?? createDefaultMissionSystemState(migratedParams.seed),
-    modding: snap.modding ?? createDefaultModdingState()
+    elevation,
+    generatedElevation: Array.isArray(snap.generatedElevation) && snap.generatedElevation.length === numCells
+      ? validateOrCloneArray(snap.generatedElevation, 0, 'generatedElevation')
+      : undefined,
+    temperature,
+    humidity: validateOrCloneArray(snap.humidity, 0.5, 'humidity'),
+    precipitation: validateOrCloneArray(snap.precipitation, 1.0, 'precipitation'),
+    iceThickness: validateOrCloneArray(snap.iceThickness, 0, 'iceThickness'),
+    waterWaveAnomaly: validateOrCloneArray(snap.waterWaveAnomaly, 0, 'waterWaveAnomaly'),
+    volcanicHeat: validateOrCloneArray(snap.volcanicHeat, 0, 'volcanicHeat'),
+    sediment: validateOrCloneArray(snap.sediment, 0, 'sediment'),
+    biomass: validateOrCloneArray(snap.biomass, 0, 'biomass'),
+    fauna: validateOrCloneArray(snap.fauna, 0, 'fauna'),
+    biodiversity: validateOrCloneArray(snap.biodiversity, 0, 'biodiversity'),
+    extinctionImpact: validateOrCloneArray(snap.extinctionImpact, 0, 'extinctionImpact'),
+    speciesLineages: Array.isArray(snap.speciesLineages)
+      ? snap.speciesLineages.map((s) => ({ ...s, traits: { ...s.traits }, innovations: [...(s.innovations || [])] }))
+      : [],
+    telemetryHistory: Array.isArray(snap.telemetryHistory) ? snap.telemetryHistory.map((h) => ({ ...h })) : [],
+    activeHazards: Array.isArray(snap.activeHazards) ? snap.activeHazards.map((h) => ({ ...h })) : [],
+    eventLog: Array.isArray(snap.eventLog) ? snap.eventLog.map((e) => ({ ...e })) : [],
+    magnetosphere: snap.magnetosphere ? JSON.parse(JSON.stringify(snap.magnetosphere)) : createDefaultMagnetosphereState(),
+    spaceWeather: snap.spaceWeather ? JSON.parse(JSON.stringify(snap.spaceWeather)) : createDefaultSpaceWeatherState(),
+    geochemistry: snap.geochemistry ? JSON.parse(JSON.stringify(snap.geochemistry)) : createDefaultGeochemistryState(),
+    naturalHistory: snap.naturalHistory ? JSON.parse(JSON.stringify(snap.naturalHistory)) : createDefaultNaturalHistoryState(),
+    exploration: snap.exploration ? JSON.parse(JSON.stringify(snap.exploration)) : createDefaultExplorationState(),
+    remoteSensing: snap.remoteSensing ? JSON.parse(JSON.stringify(snap.remoteSensing)) : createDefaultRemoteSensingState(),
+    civilization: snap.civilization ? JSON.parse(JSON.stringify(snap.civilization)) : createDefaultCivilizationState(),
+    terraforming: snap.terraforming ? JSON.parse(JSON.stringify(snap.terraforming)) : createDefaultTerraformingState(),
+    missions: snap.missions ? JSON.parse(JSON.stringify(snap.missions)) : createDefaultMissionSystemState(migratedParams.seed),
+    modding: snap.modding ? JSON.parse(JSON.stringify(snap.modding)) : createDefaultModdingState()
   };
 }
 
