@@ -51,6 +51,24 @@ Every new world starts strictly **abiotic** (0% life). You can forge a planet fr
 - **Progressive Disclosure (`Creator` vs. `Advanced` Mode)**: Switch between a streamlined Creator interface and the full Advanced scientific dashboard (`M` key).
 - **Instant Bilingual Interface**: One-click toggle (`🇬🇧 English` / `🇻🇳 Tiếng Việt`) translates every label, tooltip, tutorial step, help topic, preset, and telemetry readout in real time.
 
+### Planetary Magnetism, Space Weather & Remote Sensing (`src/sim/magnetism.ts`, `src/sim/spaceWeather.ts`, `src/sim/remoteSensing.ts`)
+- **Core Dynamo & Magnetosphere**: Models core convection heat flux, magnetic dipole moment, stand-off magnetopause radius, and inner/outer Van Allen radiation belts.
+- **Space Weather Hazards & Asteroids**: Simulates solar wind pressure, Coronal Mass Ejections (CMEs), asteroid collision tracking, kinetic deflection missions, and atmospheric entry energy release ($E_k = \frac{1}{2}mv^2$).
+- **Synthetic Remote Sensing**: Simulates orbital satellite passes with multi-spectral false-color composites, radar surface elevation mapping, and synthetic planetary observations.
+
+### Geochemistry, Natural History & Stratigraphy (`src/sim/geochemistry.ts`, `src/sim/naturalHistory.ts`)
+- **Multi-Reservoir Geochemical Cycles**: Tracks carbon, silicates, and volcanic mineral reserves across atmospheric, ocean, crustal, and mantle reservoirs.
+- **Stratigraphic Column & Fossil Record**: Records chronological rock layers, sedimentation rates, catastrophic boundary layers, and paleo-climate fossil preservation.
+
+### Frontier Exploration & Civilizations (`src/sim/exploration.ts`, `src/sim/civilization.ts`)
+- **Planetary Exploration & Atlas**: Evaluate landing sites by thermal habitability, radiation exposure, and slope hazard; bookmark landmarks with custom names in a persistent planetary atlas.
+- **Civilization Emergence & Feedback**: Tracks settlements, technological eras, energetic consumption, societal policies, and greenhouse emissions feedback into the climate model.
+
+### Terraforming, Analytics, Missions & Modding (`src/sim/terraforming.ts`, `src/sim/analytics.ts`, `src/sim/missions.ts`, `src/sim/modding.ts`, `src/ui/workflows.ts`)
+- **Planetary Engineering Projects**: Undertake orbital solar mirrors, bio-engineered microbial seeding, greenhouse gas factories, and feasibility assessments.
+- **Advanced Science Lab**: Multi-world snapshot comparison, empirical Pearson correlation analysis, windowed causal event attribution, parameter sensitivity sweeps, and Monte Carlo stability ensembles.
+- **Procedural Missions & Modding**: Procedural survival and climate challenges, custom mission JSON import/export, modding extension manifest validation, and command palette (`Ctrl+K`) workflows.
+
 ---
 
 ## 2. Screenshots & How to Capture Visuals
@@ -212,29 +230,46 @@ All scripts are defined in [`package.json`](./package.json) and verified against
 ```bash
 npm test
 ```
-Runs 9 test suites in [`tests/sim.test.ts`](./tests/sim.test.ts) verifying:
-- Deterministic seed terrain & climate reproducibility.
-- Scientific speed parsing and mode classification up to `1e100x`.
-- Numerically safe time accumulation from seconds to `1e100` seconds without `NaN` or `Infinity`.
-- Pause, resume, and single-step accuracy.
-- Coupled $\text{CO}_2$ and solar luminosity radiative forcing and ice melt response.
-- God Mode terrain sculpting, volcanic hazard state mutation, and Undo/Redo stack integrity.
-- Save/Load JSON snapshot round-trip serialization.
-- Numerical stability under extreme speeds (`1e6x`, `1e9x`, `1e100x`).
-- Bilingual i18n dictionary completeness (`en` / `vi`), two-way toggling, and `localStorage` persistence.
+Runs 28 automated acceptance tests in [`tests/sim.test.ts`](./tests/sim.test.ts) verifying:
+- Deterministic seed terrain & climate reproducibility across all 10 terrain styles.
+- Planet radius, mass, gravity derivation ($g = GM/R^2$), lapse rate, and orbital insolation.
+- 12 sculpting brush tools (including symmetry and restore).
+- Ocean coverage & sea-level hypsometric percentile solver.
+- Atmosphere gas composition validation, $\text{N}_2$ balance filler, and greenhouse forcing.
+- Abiogenesis under warm marine conditions.
+- Population growth, carrying capacity, heritable trait mutation, and natural selection.
+- Migration across neighboring cells and colonization of habitable zones.
+- Extinction tracking, lineage recording, and global planetary experiments.
+- Coupled climate-biosphere feedback ($\text{O}_2$ production and $\text{CO}_2$ drawdown).
+- Meteor damage, crater counting, tectonic boundary uplift pulse, and undo/redo.
+- Deep-time numerical stability across extreme speeds (`1e6x` to `1e100x`) without `NaN` or `Infinity`.
+- Save/load round-trip, `WorldLibraryManager`, and v1–v4 schema migration.
+- Corrupted, oversized, or non-finite save handling with clean error recovery.
+- Interactive 10-step tutorial state machine, Creator/Advanced UI modes, and keyboard shortcuts.
+- Bilingual i18n dictionary completeness (`en` / `vi`) and cross-platform portability.
+- Planetary exploration, landing site evaluation, expedition scanning, bookmarks, and atlas naming.
+- Geochemistry reservoirs, mineral deposit field, extraction, and mass-balance tracking.
+- Civilization emergence, settlements, technological milestones, and atmospheric feedback.
+- Planetary engineering & terraforming feasibility validation, execution, and cancellation.
+- Space weather, asteroid threat scheduling, energy calculation, and stellar flares.
+- Planetary magnetism, radiation belts, scenario presets, and synthetic remote sensing.
+- Natural history, stratigraphic column recording, fossil preservation, and paleo reconstruction.
+- Planetary analytics: multi-world comparison, metric correlation, causal chains, sweeps, Monte Carlo, and CSV export.
+- Procedural missions, challenge import/export, modding manifest validation, and command palette workflows.
+- Snapshot deep clone isolation, non-finite guard rejection, flora trophic guild seeding, and analytics robustness.
 
 ### 2. Run Real Simulation Performance Benchmarks (`tsx`)
 ```bash
 npm run bench
 ```
-Executes [`src/sim/benchmark.ts`](./src/sim/benchmark.ts) in Node.js to measure initialization time, `REALTIME` step latency, `COARSE_TIME` (`1e6x`) frame latency, and heap memory usage across `72×36`, `144×72`, and `288×144` spherical grids.
+Executes [`src/sim/benchmark.ts`](./src/sim/benchmark.ts) in Node.js to measure initialization time, `REALTIME` step latency, `COARSE_TIME` (`1e6x`) frame latency, and heap memory usage across `72×36`, `144×72`, and `288×144` spherical grids. Note: step throughput indicates internal numerical simulation integration capacity and must not be confused with rendered WebGL Three.js display FPS.
 
 **Sample Verified Benchmark Output (Node.js v26.11.1 on Linux):**
 ```text
 === HXN GENESIS — REAL SIMULATION PERFORMANCE BENCHMARK ===
-Grid 72x36 (2592 cells)   | Init: 38.1 ms | REALTIME Step: 1.71 ms (584 FPS ceiling) | COARSE (1e6x) Frame: 7.88 ms  | Heap Δ: ~3946 KB
-Grid 144x72 (10368 cells) | Init: 35.0 ms | REALTIME Step: 5.73 ms (175 FPS ceiling) | COARSE (1e6x) Frame: 26.72 ms | Heap Δ: ~294 KB
-Grid 288x144 (41472 cells)| Init: 78.7 ms | REALTIME Step: 21.50 ms (47 FPS ceiling) | COARSE (1e6x) Frame: 83.72 ms | Heap Δ: ~128 KB
+Grid 72x36 (2592 cells)   | Init: 56.2 ms | REALTIME Step: 3.99 ms (251 sim-steps/sec ceiling) | COARSE (1e6x) Frame: 10.40 ms | Heap Δ: ~829 KB
+Grid 144x72 (10368 cells) | Init: 46.0 ms | REALTIME Step: 7.84 ms (128 sim-steps/sec ceiling) | COARSE (1e6x) Frame: 32.96 ms | Heap Δ: ~128 KB
+Grid 288x144 (41472 cells)| Init: 129.1 ms| REALTIME Step: 32.80 ms (30 sim-steps/sec ceiling) | COARSE (1e6x) Frame: 161.77 ms| Heap Δ: ~128 KB
 ```
 
 ### 3. Build & Preview Production Bundle
@@ -280,9 +315,18 @@ npm run preview
 4. **🧬 Evo Lab (Evolution Lab & Phylogeny)**:
    - View real-time HTML5 Canvas time-series charts for **Biomass & Fauna**, **Biodiversity ($H'$) & Living Species**, **Surface Temp & Habitability**, or **Atmospheric $\text{O}_2$ & $\text{CO}_2$**.
    - Search and inspect all extant and extinct **Species Lineages**, viewing their binomial name, trophic guild (`MICROBE_CHEMO`, `PRODUCER_FLORA`, `HERBIVORE_GRAZER`, `APEX_PREDATOR`), ancestor lineage, quantitative traits ($T_{\text{opt}}$, $\text{O}_2$ requirement, hazard resilience), evolutionary innovations, population share, and optional single-species extirpation.
-5. **Save & Log**:
-   - Save named **Checkpoints** to browser `localStorage` and restore them with one click (supporting backward compatibility across v1, v2, and v3 snapshots).
+5. **🧭 Frontier (Planetary Exploration & Civilization)**:
+   - **Exploration Expeditions**: Dispatch surface probes and rovers to evaluate landing site habitability, radiation exposure, terrain slope, and resource yields.
+   - **Cartographic Atlas**: Bookmark points of interest, name geographic landmarks, and inspect regional biomes.
+   - **Civilization & Settlements**: Track intelligent civilization emergence, settlement expansion, technology milestones, societal policies, energy usage, and industrial emissions feedback.
+6. **🛰 Science Lab (Geochemistry, Magnetism & Analytics)**:
+   - **Planetary Magnetism & Space Weather**: Simulate dynamo magnetic dipole moments, Van Allen radiation belts, solar wind deflection, asteroid threat scheduling, and kinetic deflection missions.
+   - **Geochemistry & Stratigraphy**: Track mantle, crustal, ocean, and atmospheric mineral reservoirs, mining extractions, and geological strata fossil preservation.
+   - **Planetary Analytics & Terraforming**: Run multi-snapshot comparisons, empirical Pearson metric correlations, windowed causal event attribution, bounded parameter sweeps, and Monte Carlo stability ensembles.
+7. **Save & Log**:
+   - Save named **Checkpoints** to browser `localStorage` and restore them with one click (supporting backward compatibility across v1, v2, v3, and v4 snapshots).
    - Click **Export JSON** to download a full `.json` snapshot file of the planet, or **Import JSON** to restore a saved file.
+   - Review chronological **Sim Event Log** with spatial coordinate tags and event categories.
 
 ---
 
@@ -309,44 +353,61 @@ Ensure the imported `.json` file was exported from HXN GENESIS with matching gri
 ## 11. Project Directory Structure & Module Architecture
 
 ```text
-HXN-GENESIS/
-├── .gitignore                  # Standard Git ignore rules (node_modules, dist, logs)
-├── index.html                  # Main application HTML shell with 3.0 Creator/Advanced UI & modals
-├── package.json                # npm scripts, Node >=20 engine spec, and dependencies (v3.0.0)
-├── package-lock.json           # Locked npm dependency tree for reproducible installs
-├── requirements.txt            # Human-readable system & runtime dependency reference (non-pip)
-├── requirements-dev.txt        # Human-readable development/test dependency reference (non-pip)
-├── tsconfig.json               # TypeScript compiler configuration (ES2022, strict mode)
-├── vite.config.ts              # Vite dev server (127.0.0.1:5173) and Vitest configuration
-├── README.md                   # Complete installation, architecture, and user documentation
+hxn-genesis/
+├── .gitignore                  # Git ignore rules (node_modules, dist, logs)
+├── index.html                  # Main application HTML shell with Creator/Advanced UI, modals & tabs
+├── package.json                # Project manifest, npm scripts, dependencies & Node >=20 engine spec
+├── package-lock.json           # Locked npm dependency tree for reproducible installations
+├── README.md                   # Complete system documentation, architecture & user guide
+├── requirements.txt            # System and runtime dependency manifest (reference)
+├── requirements-dev.txt        # Development and testing dependency manifest (reference)
+├── tsconfig.json               # TypeScript compiler configuration (ES2022, strict typecheck)
+├── vite.config.ts              # Vite dev server configuration (127.0.0.1:5173) & Vitest test runner setup
+├── dist/                       # Production build output (generated via npm run build)
+│   ├── assets/
+│   │   ├── index-[hash].css    # Bundled & minified stylesheet
+│   │   └── index-[hash].js     # Bundled & minified application code (Three.js + simulation core)
+│   └── index.html              # Production HTML entry point
 ├── src/
-│   ├── main.ts                 # UI controller, tutorial/library wiring, charts & event bindings
-│   ├── style.css               # Dark-mode Glassmorphism layout, modals, tutorial & Creator mode styles
 │   ├── i18n/
-│   │   └── index.ts            # Centralized English/Vietnamese translation dictionaries & I18nManager
+│   │   └── index.ts            # Centralized bilingual dictionaries (EN / VI) & I18nManager
+│   ├── main.ts                 # UI controller, tutorial/library wiring, charts & event bindings
 │   ├── persistence/
-│   │   └── worldStore.ts       # WorldLibraryManager, v1–v4 migration & validated JSON import/export
+│   │   └── worldStore.ts       # WorldLibraryManager, v1–v4 schema migration, validated JSON import/export
 │   ├── render/
-│   │   └── planetRenderer.ts   # Three.js 3D globe, radius scaling, graticule/axis, ocean, clouds, halo
-│   ├── ui/
-│   │   ├── tutorial.ts         # First-run Welcome screen, 10-step guided tour, UI mode & Help catalog
-│   │   └── shortcuts.ts        # Keyboard shortcut registry and dispatcher
-│   └── sim/                    # Pure TypeScript simulation core (zero DOM or Three.js dependencies)
-│       ├── world.ts            # Coupled climate, biosphere, evolution, hydrology, geology & hazards
-│       ├── planetPhysics.ts    # Physical/orbital properties, gravity/density/escape/lapse derivation
-│       ├── terrainGen.ts       # 10 procedural TerrainStyle generators & hypsometric ocean solver
-│       ├── sculpt.ts           # 12 spherical terrain & cryosphere brushes with falloff/shape/symmetry
-│       ├── atmosphere.ts       # Gas composition (O2, CO2, Ar, N2 filler) & pressure-broadened forcing
-│       ├── geology.ts          # Internal heat, crust thickness & Voronoi plate boundary uplift pulses
-│       ├── events.ts           # Global planetary experiments & destructive confirmation rules
-│       ├── evolution.ts        # Population-based EvolutionEngine, traits, selection & speciation
-│       ├── time.ts             # Numerically safe SafeSimTimeState, SciNumber & 5 time execution modes
-│       ├── rng.ts              # Deterministic Mulberry32 PRNG & 3D Perlin / Ridged Multifractal noise
-│       ├── presets.ts          # 12 planetary scenarios (Earth-like, Young Planet, Greenhouse, etc.)
-│       ├── types.ts            # TypeScript interfaces for simulation state, telemetry & v4 snapshots
-│       └── benchmark.ts        # CLI performance benchmark across spherical grid resolutions
+│   │   └── planetRenderer.ts   # Three.js 3D globe, shaders, camera controls, layers & marker rendering
+│   ├── sim/                    # Pure TypeScript simulation core (zero DOM or Three.js dependencies)
+│   │   ├── analytics.ts        # Empirical correlations, causal attribution, sweeps & Monte Carlo ensembles
+│   │   ├── atmosphere.ts       # Gas composition (O2, CO2, Ar, N2 filler) & greenhouse radiative forcing
+│   │   ├── benchmark.ts        # CLI performance benchmark measuring step latencies & heap deltas
+│   │   ├── civilization.ts     # Societal emergence, tech eras, settlements, policies & emissions
+│   │   ├── events.ts           # Global planetary experiments & destructive action safeguards
+│   │   ├── evolution.ts        # Population-based EvolutionEngine, heritable traits, selection & speciation
+│   │   ├── exploration.ts      # Surface probes, landing site scoring & geographic landmark naming
+│   │   ├── geochemistry.ts     # Multi-reservoir carbon/silicate/mineral mass-balance cycles
+│   │   ├── geology.ts          # Internal radiogenic heat, crust thickness & Voronoi tectonic uplift pulses
+│   │   ├── magnetism.ts        # Core dynamo field, dipole moment, magnetopause & radiation belts
+│   │   ├── missions.ts         # Procedural challenges, milestone progression & custom challenge imports
+│   │   ├── modding.ts          # Extension manifest validation and mod lifecycle hooks
+│   │   ├── naturalHistory.ts   # Stratigraphic columns, fossil preservation & paleo reconstruction
+│   │   ├── planetPhysics.ts    # Physical/orbital properties, gravity/density/escape/lapse derivation
+│   │   ├── presets.ts          # 12 planetary scenarios (Earth-like, Young Planet, Volcanic, etc.)
+│   │   ├── remoteSensing.ts    # Synthetic orbital observations, false-color imaging & sensor channels
+│   │   ├── rng.ts              # Deterministic Mulberry32 PRNG & 3D Perlin / Ridged Multifractal noise
+│   │   ├── sculpt.ts           # 12 spherical terrain & cryosphere brushes with falloff/shape/symmetry
+│   │   ├── spaceWeather.ts     # Solar wind flux, coronal mass ejections & asteroid impact hazards
+│   │   ├── terraforming.ts     # Atmospheric engineering, orbital mirrors & geoengineering projects
+│   │   ├── terrainGen.ts       # 10 procedural TerrainStyle generators & hypsometric ocean solver
+│   │   ├── time.ts             # Numerically safe SafeSimTimeState, SciNumber & 5 time execution modes
+│   │   ├── types.ts            # TypeScript interfaces for simulation state, telemetry & v4 snapshots
+│   │   └── world.ts            # Master WorldSimulation orchestrating coupled climate, life, geology & hazards
+│   ├── style.css               # Glassmorphism styling, layout, HUD, modals & responsive UI
+│   └── ui/
+│       ├── shortcuts.ts        # Keyboard shortcut registry and dispatcher
+│       ├── tutorial.ts         # First-run Welcome modal, 10-step guided tour, UI mode & Help catalog
+│       └── workflows.ts        # Command palette actions, guided tour stops & quick workflow triggers
 └── tests/
-    └── sim.test.ts             # Vitest unit & integration test suite (18 comprehensive acceptance tests)
+    └── sim.test.ts             # Vitest acceptance test suite (28 comprehensive automated tests)
 ```
 
 ---
@@ -365,6 +426,12 @@ HXN GENESIS implements physically motivated, coupled reduced-complexity models d
    - As required by numerical honesty, the engine never claims to execute $10^{100}$ discrete integration steps. In `ANALYTICAL_ADVANCE` and `VISUAL_TIME_WARP` modes, short-lived weather transients decay, $\text{CO}_2$ relaxes toward a volcanic-silicate weathering balance, continental relief undergoes bounded exponential peneplanation balanced by tectonic rejuvenation, and the exact ratio of computed vs. bypassed steps is displayed in the telemetry panel.
 5. **Continental Drift (Wilson Cycles)**:
    - Local crust uplift/subsidence, fault displacement, volcanic cone growth, and fluvial/thermal erosion are simulated; full horizontal tectonic plate advection across hundreds of millions of years is not yet modeled.
+6. **Empirical Causal Attribution & Statistical Correlation**:
+   - Correlation reports calculate historical Pearson $r$ coefficients over finite samples, with disclaimers emphasizing that correlation does not establish physical causation. Causal attribution chains evaluate localized telemetry delta windows around the specific event step rather than assuming single events caused total planetary evolutionary drift.
+7. **Planetary Magnetism & Space Weather**:
+   - Magnetic shielding uses a dipolar approximation scaled to planetary radius and core convection heat flux; magnetopause stand-off distances follow pressure-balance relationships without solving 3D magnetohydrodynamic (MHD) equations.
+8. **Computational Workload Bounds**:
+   - Expensive analytical procedures are bounded to safeguard main-thread responsiveness: parameter sensitivity sweeps evaluate up to 16 points, and Monte Carlo ensembles run up to 10 iterations.
 
 ---
 
